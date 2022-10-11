@@ -15,7 +15,6 @@ from sklearn.feature_extraction.text import CountVectorizer
 from collections import defaultdict
 import codecs
 
-inputFileLineCount = 4077
 header = ["train_id", "Sentence_1", "Sentence_2", "Output"]
 
 df = pd.read_csv('train_with_label.txt', sep='\t', on_bad_lines='skip', names=header, engine='python')
@@ -55,17 +54,71 @@ removedNull = df.dropna()
 Xdev = removedNull[["Sentence_1", "Sentence_2"]]
 ydev = removedNull["Output"]
 
-test_header = ["test_id", "Sentence_1", "Sentence_2"]
-test = pd.read_csv('dev_with_label.txt', sep='\t', on_bad_lines='skip', names=header, engine='python')
-test['Sentence_1'] = df['Sentence_1'].apply(lambda x: ' '.join([word for word in x.split() if word not in stop_words]))
-test['Sentence_2'] = df['Sentence_2'].apply(lambda x: ' '.join([word for word in x.split() if word not in stop_words]))
-
-test['Sentence_1'] = df['Sentence_1'].apply(lemmatize_text)
-test['Sentence_2'] = df['Sentence_2'].apply(lemmatize_text)
-
-removedNull = df.dropna()
-Xtest = removedNull[["Sentence_1", "Sentence_2"]]
+# test_header = ["test_id", "Sentence_1", "Sentence_2"]
+# test = pd.read_csv('dev_with_label.txt', sep='\t', on_bad_lines='skip', names=header, engine='python')
+# test['Sentence_1'] = df['Sentence_1'].apply(lambda x: ' '.join([word for word in x.split() if word not in stop_words]))
+# test['Sentence_2'] = df['Sentence_2'].apply(lambda x: ' '.join([word for word in x.split() if word not in stop_words]))
+#
+# test['Sentence_1'] = df['Sentence_1'].apply(lemmatize_text)
+# test['Sentence_2'] = df['Sentence_2'].apply(lemmatize_text)
+#
+# removedNull = df.dropna()
+# Xtest = removedNull[["Sentence_1", "Sentence_2"]]
 
 # Now, we need to define a corpus.
-# I will use all the words that appear in all datasets, including dev train and test
+# I will use all the sentence pairs that appear in the training set
 
+vec = CountVectorizer()
+X = vec.fit_transform(X)
+vocab = vec.get_feature_names_out()
+X = X.toarray()
+word_counts = {}
+for l in range(2):
+    word_counts[l] = defaultdict(lambda: 0)
+for i in range(X.shape[0]):
+    l = y[i]
+    for j in range(len(vocab)):
+        word_counts[l][vocab[j]] += X[i][j]
+
+
+def laplace_smoothing(n_label_items, vocab, word_counts, word, text_label):
+    a = word_counts[text_label][word] + 1
+    b = n_label_items[text_label] + len(vocab)
+    return math.log(a / b)
+
+def group_by_label(x, y, labels):
+    data = {}
+    for l in labels:
+        data[l] = x[np.where(y == l)]
+    return data
+
+
+def fit(x, y, labels):
+    n_label_items = {}
+    log_label_priors = {}
+    n = len(x)
+    grouped_data = group_by_label(x, y, labels)
+    for l, data in grouped_data.items():
+        n_label_items[l] = len(data)
+        log_label_priors[l] = math.log(n_label_items[l] / n)
+    return n_label_items, log_label_priors
+
+
+def predict(n_label_items, vocab, word_counts, log_label_priors, labels, x):
+    result = []
+    for text in x:
+        label_scores = {l: log_label_priors[l] for l in labels}
+        words = set(w_tokenizer.tokenize(text))
+        for word in words:
+            if word not in vocab: continue
+            for l in labels:
+                log_w_given_l = laplace_smoothing(n_label_items, vocab, word_counts, word, l)
+                label_scores[l] += log_w_given_l
+        result.append(max(label_scores, key=label_scores.get))
+    return result
+
+
+labels = [0,1]
+n_label_items, log_label_priors = fit(X,y,labels)
+pred = predict(n_label_items, vocab, word_counts, log_label_priors, labels, Xdev)
+print("Accuracy of prediction on test set : ", accuracy_score(ydev,pred))
