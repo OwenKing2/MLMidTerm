@@ -85,14 +85,11 @@ def feature_extractor(sentence1array, sentence2array):
     for (sentence_1, sentence_2) in itertools.zip_longest(sentence1array, sentence2array):
         sentence_1_words = nltk.word_tokenize(sentence_1)
         sentence_2_words = nltk.word_tokenize(sentence_2)
-        sentence_1_bigrams = nltk.bigrams(sentence_1_words)
-        sentence_1_trigrams = nltk.trigrams(sentence_1_words)
-        sentence_2_bigrams = nltk.bigrams(sentence_2_words)
-        sentence_2_trigrams = nltk.trigrams(sentence_2_words)
+        sentence_1_bigrams = list(nltk.bigrams(sentence_1_words))
+        sentence_1_trigrams = list(nltk.trigrams(sentence_1_words))
+        sentence_2_bigrams = list(nltk.bigrams(sentence_2_words))
+        sentence_2_trigrams = list(nltk.trigrams(sentence_2_words))
 
-        # Have to make these since generator objects are used up after loop, so to get length we make a list copy
-        count_sentence_2_bigrams = list(sentence_2_bigrams)
-        count_sentence_2_trigrams = list(sentence_2_trigrams)
         # I will use the total number of bigrams and trigrams in sentence 2 as the bottom of my ratio
         bigramMatches = 0
         for phrase in sentence_1_bigrams:
@@ -102,8 +99,8 @@ def feature_extractor(sentence1array, sentence2array):
         for phrase in sentence_1_trigrams:
             if phrase in sentence_2_trigrams:
                 trigramMatches += 1
-        twograms.append(bigramMatches / len(count_sentence_2_bigrams))
-        threegrams.append(trigramMatches / len(list(count_sentence_2_trigrams)))
+        twograms.append(bigramMatches / len(sentence_2_bigrams))
+        threegrams.append(trigramMatches / len(sentence_2_trigrams))
     features['2grams'] = twograms
     features['3grams'] = threegrams
 
