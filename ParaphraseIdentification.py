@@ -5,6 +5,7 @@ from tabulate import tabulate
 from sklearn.svm import SVC
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score
+from sklearn.pipeline import make_pipeline
 import nltk
 from nltk.corpus import stopwords
 from nltk.stem.wordnet import WordNetLemmatizer
@@ -16,48 +17,38 @@ import codecs
 import string
 import itertools
 
-header = ["train_id", "Sentence_1", "Sentence_2", "Output"]
 
-df = pd.read_csv('train_with_label.txt', sep='\t', on_bad_lines='skip', names=header, engine='python')
+def datapreprocess(filename):
+    header = ["train_id", "Sentence_1", "Sentence_2", "Output"]
+    df = pd.read_csv(filename, sep='\t', on_bad_lines='skip', names=header, engine='python')
+    stop_words = set(stopwords.words('english'))
+    df['Sentence_1'] = df['Sentence_1'].apply(
+        lambda x: ' '.join([word for word in x.split() if word not in stop_words]))
+    df['Sentence_2'] = df['Sentence_2'].apply(
+        lambda x: ' '.join([word for word in x.split() if word not in stop_words]))
+    w_tokenizer = nltk.tokenize.WhitespaceTokenizer()
+    lemmatizer = nltk.stem.WordNetLemmatizer()
 
-# Preprocessing
-# nltk.download('omw-1.4')
-# nltk.download('stopwords')
-# nltk.download('punkt')
-stop_words = set(stopwords.words('english'))
-df['Sentence_1'] = df['Sentence_1'].apply(lambda x: ' '.join([word for word in x.split() if word not in stop_words]))
-df['Sentence_2'] = df['Sentence_2'].apply(lambda x: ' '.join([word for word in x.split() if word not in stop_words]))
-w_tokenizer = nltk.tokenize.WhitespaceTokenizer()
-lemmatizer = nltk.stem.WordNetLemmatizer()
+    def lemmatize_text(text):
+        st = ""
+        for w in w_tokenizer.tokenize(text):
+            st = st + lemmatizer.lemmatize(w) + " "
+        return st
 
+    # gets roots of words for comparison
+    df['Sentence_1'] = df['Sentence_1'].apply(lemmatize_text)
+    df['Sentence_2'] = df['Sentence_2'].apply(lemmatize_text)
 
-def lemmatize_text(text):
-    st = ""
-    for w in w_tokenizer.tokenize(text):
-        st = st + lemmatizer.lemmatize(w) + " "
-    return st
+    # Remove punctuation
+    df['Sentence_1'] = df['Sentence_1'].apply(lambda x: x.translate(str.maketrans('', '', string.punctuation)))
+    df['Sentence_2'] = df['Sentence_2'].apply(lambda x: x.translate(str.maketrans('', '', string.punctuation)))
 
+    # Make all words lowercase
+    df['Sentence_1'] = df['Sentence_1'].str.lower()
+    df['Sentence_2'] = df['Sentence_2'].str.lower()
 
-# gets roots of words for comparison
-df['Sentence_1'] = df['Sentence_1'].apply(lemmatize_text)
-df['Sentence_2'] = df['Sentence_2'].apply(lemmatize_text)
+    return df.dropna()
 
-# Remove punctuation
-df['Sentence_1'] = df['Sentence_1'].apply(lambda x: x.translate(str.maketrans('', '', string.punctuation)))
-df['Sentence_2'] = df['Sentence_2'].apply(lambda x: x.translate(str.maketrans('', '', string.punctuation)))
-
-# Make all words lowercase
-df['Sentence_1'] = df['Sentence_1'].str.lower()
-df['Sentence_2'] = df['Sentence_2'].str.lower()
-
-removedNull = df.dropna()
-
-
-# This is where the mistake is, need to make a function to define the features
-# from the input sentences, so that I can run the same function on the DEV and TEST sets
-# Current feature ideas are, ngram matching (thinking 1 and 2 grams)
-# Actually looks like I can use the CountVectorizer, from sklearn
-# Just need to specify the correct features
 
 def feature_extractor(sentence1array, sentence2array):
     features = pd.DataFrame(columns=['Length Comparison', 'Proportion of Matching Words', "2grams", "3grams"])
@@ -109,29 +100,14 @@ def feature_extractor(sentence1array, sentence2array):
     return features
 
 
-X = feature_extractor(removedNull["Sentence_1"], removedNull["Sentence_2"])
-y = removedNull["Output"]
+training_data = datapreprocess("train_with_label.txt")
+X = feature_extractor(training_data["Sentence_1"], training_data["Sentence_2"])
+y = training_data["Output"]
+clf = make_pipeline(StandardScaler(), SVC(gamma='auto'))
+clf.fit(X, y)
 
-dev = pd.read_csv('dev_with_label.txt', sep='\t', on_bad_lines='skip', names=header, engine='python')
-dev['Sentence_1'] = df['Sentence_1'].apply(lambda x: ' '.join([word for word in x.split() if word not in stop_words]))
-dev['Sentence_2'] = df['Sentence_2'].apply(lambda x: ' '.join([word for word in x.split() if word not in stop_words]))
+dev_data = datapreprocess("dev_with_label.txt")
+Xdev = feature_extractor(dev_data["Sentence_1"], dev_data["Sentence_2"])
+ydev = dev_data["Output"]
 
-dev['Sentence_1'] = df['Sentence_1'].apply(lemmatize_text)
-dev['Sentence_2'] = df['Sentence_2'].apply(lemmatize_text)
-
-removedNull = df.dropna()
-Xdev = removedNull[["Sentence_1", "Sentence_2"]]
-ydev = removedNull["Output"]
-
-# test_header = ["test_id", "Sentence_1", "Sentence_2"]
-# test = pd.read_csv('dev_with_label.txt', sep='\t', on_bad_lines='skip', names=header, engine='python')
-# test['Sentence_1'] = df['Sentence_1'].apply(lambda x: ' '.join([word for word in x.split() if word not in stop_words]))
-# test['Sentence_2'] = df['Sentence_2'].apply(lambda x: ' '.join([word for word in x.split() if word not in stop_words]))
-#
-# test['Sentence_1'] = df['Sentence_1'].apply(lemmatize_text)
-# test['Sentence_2'] = df['Sentence_2'].apply(lemmatize_text)
-#
-# removedNull = df.dropna()
-# Xtest = removedNull[["Sentence_1", "Sentence_2"]]
-
-#
+print(clf.score(Xdev, ydev))
