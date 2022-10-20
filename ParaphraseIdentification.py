@@ -1,11 +1,14 @@
 import numpy as np
 import pandas as pd
+import sklearn.preprocessing
 from IPython.display import display
 from tabulate import tabulate
 from sklearn.svm import SVC
 from sklearn.preprocessing import StandardScaler
+from sklearn import preprocessing
 from sklearn.metrics import accuracy_score
 from sklearn.pipeline import make_pipeline
+from nltk.translate.bleu_score import sentence_bleu,SmoothingFunction
 import nltk
 from nltk.corpus import stopwords
 from nltk.stem.wordnet import WordNetLemmatizer
@@ -19,6 +22,16 @@ import itertools
 
 
 def datapreprocess(filename):
+    # nltk.download('omw-1.4')
+    # nltk.download('stopwords')
+    # nltk.download('punkt')
+    # nltk.download('wordnet')
+    #
+    # try:
+    #     nltk.data.find('tokenizers/punkt')
+    # except LookupError:
+    #     nltk.download('punkt')
+
     header = ["train_id", "Sentence_1", "Sentence_2", "Output"]
     df = pd.read_csv(filename, sep='\t', on_bad_lines='skip', names=header, engine='python')
     stop_words = set(stopwords.words('english'))
@@ -50,13 +63,30 @@ def datapreprocess(filename):
     return df.dropna()
 
 
+def bleu_score(sentence1array, sentence2array):
+    features = pd.DataFrame(columns=["BLEU_SCORES"])
+    bleu_scores = []
+    smooth = SmoothingFunction()
+    for (sentence_1, sentence_2) in itertools.zip_longest(sentence1array, sentence2array):
+        first_sentence = nltk.word_tokenize(sentence_1)
+        second_sentence = nltk.word_tokenize(sentence_2)
+        bleu_scores.append(round(nltk.translate.bleu_score.sentence_bleu([first_sentence], second_sentence)))
+    # for sentence in sentence1array:
+    #     first_sentence = nltk.word_tokenize(sentence)
+    #     for second_phrase in sentence2array:
+    #         second_sentence = nltk.word_tokenize(second_phrase)
+    #         bleu_scores.append(nltk.translate.bleu_score.sentence_bleu([first_sentence], second_sentence))
+    features["BLEU_SCORES"] = bleu_scores
+    return features
+
+
 def feature_extractor(sentence1array, sentence2array):
-    features = pd.DataFrame(columns=['Length Comparison', 'Proportion of Matching Words', "2grams", "3grams"])
+    features = pd.DataFrame(columns=["Length Comparison", "Proportion of Matching Words", "bleu_score"])
 
     # Length Dissimilarity: If one is much shorter or longer, it will be a higher value
     length = []
     for (sentence_1, sentence_2) in itertools.zip_longest(sentence1array, sentence2array):
-        length.append(abs(len(sentence_1) - len(sentence_2)))
+        length.append(abs(len(sentence_1) - len(sentence_2)) / ((len(sentence_1) + len(sentence_2)) / 2))
     features['Length Comparison'] = length
 
     # total number of matching words divided by total number of unique words
@@ -71,31 +101,56 @@ def feature_extractor(sentence1array, sentence2array):
     features['Proportion of Matching Words'] = matching
 
     # ngrams matches (currently checking 2 and 3 grams)
+    unigrams = []
     twograms = []
     threegrams = []
+    fourgrams = []
     for (sentence_1, sentence_2) in itertools.zip_longest(sentence1array, sentence2array):
         sentence_1_words = nltk.word_tokenize(sentence_1)
         sentence_2_words = nltk.word_tokenize(sentence_2)
+        sentence_1_unigrams = list(nltk.ngrams(sentence_1_words, 1))
+        sentence_2_unigrams = list(nltk.ngrams(sentence_1_words, 1))
         sentence_1_bigrams = list(nltk.bigrams(sentence_1_words))
         sentence_1_trigrams = list(nltk.trigrams(sentence_1_words))
         sentence_2_bigrams = list(nltk.bigrams(sentence_2_words))
         sentence_2_trigrams = list(nltk.trigrams(sentence_2_words))
+        sentence_1_fourgrams = list(nltk.ngrams(sentence_1_words, 4))
+        sentence_2_fourgrams = list(nltk.ngrams(sentence_1_words, 4))
 
         # I will use the total number of bigrams and trigrams in sentence 2 as the bottom of my ratio
-        bigramMatches = 0
+        unigram_matches = 0
+        for phrase in sentence_1_unigrams:
+            if phrase in sentence_2_unigrams:
+                unigram_matches += 1
+
+        bigram_matches = 0
         for phrase in sentence_1_bigrams:
             if phrase in sentence_2_bigrams:
-                bigramMatches += 1
-        trigramMatches = 0
+                bigram_matches += 1
+
+        trigram_matches = 0
         for phrase in sentence_1_trigrams:
             if phrase in sentence_2_trigrams:
-                trigramMatches += 1
-        twograms.append(bigramMatches / len(sentence_2_bigrams))
-        threegrams.append(trigramMatches / len(sentence_2_trigrams))
-    features['2grams'] = twograms
-    features['3grams'] = threegrams
+                trigram_matches += 1
 
+        fourgram_matches = 0
+        for phrase in sentence_1_fourgrams:
+            if phrase in sentence_2_fourgrams:
+                fourgram_matches += 1
+
+        unigrams.append(unigram_matches)
+        twograms.append(bigram_matches)
+        threegrams.append(trigram_matches)
+        fourgrams.append(fourgram_matches)
+
+    #features['1grams'] = unigrams
+    #features['2grams'] = twograms
+    #features['3grams'] = threegrams
+    #features['4grams'] = fourgrams
+
+    features["bleu_score"] = bleu_score(sentence1array,sentence2array)
     # synonyms and hypernyms to be implemented later, want to focus on getting some level of output first
+
 
     return features
 
