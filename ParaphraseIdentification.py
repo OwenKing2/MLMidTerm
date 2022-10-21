@@ -3,12 +3,15 @@ import pandas as pd
 import sklearn.preprocessing
 from IPython.display import display
 from tabulate import tabulate
-from sklearn.svm import SVC
-from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC, LinearSVC
+from sklearn.linear_model import SGDClassifier, LogisticRegression
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.ensemble import RandomForestClassifier
 from sklearn import preprocessing
 from sklearn.metrics import accuracy_score
 from sklearn.pipeline import make_pipeline
-from nltk.translate.bleu_score import sentence_bleu,SmoothingFunction
+from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 import nltk
 from nltk.corpus import stopwords
 from nltk.stem.wordnet import WordNetLemmatizer
@@ -70,7 +73,8 @@ def bleu_score(sentence1array, sentence2array):
     for (sentence_1, sentence_2) in itertools.zip_longest(sentence1array, sentence2array):
         first_sentence = nltk.word_tokenize(sentence_1)
         second_sentence = nltk.word_tokenize(sentence_2)
-        bleu_scores.append(round(nltk.translate.bleu_score.sentence_bleu([first_sentence], second_sentence)))
+        bleu_scores.append(round(nltk.translate.bleu_score.sentence_bleu([first_sentence], second_sentence,
+                                                                         smoothing_function=smooth.method3)))
     # for sentence in sentence1array:
     #     first_sentence = nltk.word_tokenize(sentence)
     #     for second_phrase in sentence2array:
@@ -143,14 +147,13 @@ def feature_extractor(sentence1array, sentence2array):
         threegrams.append(trigram_matches)
         fourgrams.append(fourgram_matches)
 
-    #features['1grams'] = unigrams
-    #features['2grams'] = twograms
-    #features['3grams'] = threegrams
-    #features['4grams'] = fourgrams
+    # features['1grams'] = unigrams
+    # features['2grams'] = twograms
+    # features['3grams'] = threegrams
+    # features['4grams'] = fourgrams
 
-    features["bleu_score"] = bleu_score(sentence1array,sentence2array)
+    features["bleu_score"] = bleu_score(sentence1array, sentence2array)
     # synonyms and hypernyms to be implemented later, want to focus on getting some level of output first
-
 
     return features
 
@@ -158,11 +161,35 @@ def feature_extractor(sentence1array, sentence2array):
 training_data = datapreprocess("train_with_label.txt")
 X = feature_extractor(training_data["Sentence_1"], training_data["Sentence_2"])
 y = training_data["Output"]
-clf = make_pipeline(StandardScaler(), SVC(gamma='auto'))
-clf.fit(X, y)
+
+SVC = make_pipeline(StandardScaler(), SVC(kernel="sigmoid"))
+SVC.fit(X, y)
+
+linearSVC = make_pipeline(StandardScaler(), LinearSVC(dual=False, tol=1e-5))
+linearSVC.fit(X, y)
+
+sgdClassifier = make_pipeline(StandardScaler(), SGDClassifier(loss="perceptron", learning_rate="optimal", eta0=0.01, alpha=0.00001))
+sgdClassifier.fit(X, y)
+
+logisticRegression = make_pipeline(StandardScaler(), LogisticRegression())
+logisticRegression.fit(X, y)
+
+multiNomialNB = make_pipeline(MinMaxScaler(), MultinomialNB())
+multiNomialNB.fit(X, y)
+
+randomForest = make_pipeline(MinMaxScaler(), RandomForestClassifier(bootstrap=True, class_weight="balanced"))
+randomForest.fit(X, y)
 
 dev_data = datapreprocess("dev_with_label.txt")
 Xdev = feature_extractor(dev_data["Sentence_1"], dev_data["Sentence_2"])
 ydev = dev_data["Output"]
 
-print(clf.score(Xdev, ydev))
+print("SVC model accuracy: " + str(SVC.score(Xdev, ydev)))
+print("linearSVC model accuracy: " + str(linearSVC.score(Xdev, ydev)))
+# Stochastic gradient descent has given me the highest accuracy scores, but is wildly inconsistent
+# It has given me scores ranging from ~ 38-70% accuracy.  Perceptron loss model seems like it gives the highest
+# Accuracy, now just need to work on making it more consistent
+print("Stochastic Gradient Descent model accuracy: " + str(sgdClassifier.score(Xdev, ydev)))
+print("Logistic Regression model accuracy: " + str(logisticRegression.score(Xdev, ydev)))
+print("Multinomial Naive Bayes model accuracy: " + str(multiNomialNB.score(Xdev, ydev)))
+print("Random Forest Ensemble model accuracy: " + str(randomForest.score(Xdev, ydev)))
