@@ -171,15 +171,54 @@ dev_data = datapreprocess("dev_with_label.txt")
 Xdev = feature_extractor(dev_data["Sentence_1"], dev_data["Sentence_2"])
 ydev = dev_data["Output"]
 
-SVC = make_pipeline(StandardScaler(), SVC(kernel="sigmoid"))
-SVC.fit(X, y)
+# SVC = make_pipeline(StandardScaler(), SVC(kernel="sigmoid"))
+# SVC.fit(X, y)
+#
+# # linearSVC = make_pipeline(StandardScaler(), LinearSVC(dual=False, tol=1e-5))
+# # linearSVC.fit(X, y)
+#
+# logisticRegression = make_pipeline(StandardScaler(), LogisticRegression())
+# logisticRegression.fit(X, y)
+#
+# print("SVC model accuracy: " + str(SVC.score(Xdev, ydev)))
+# # print("linearSVC model accuracy: " + str(linearSVC.score(Xdev, ydev)))
+# print("Logistic Regression model accuracy: " + str(logisticRegression.score(Xdev, ydev)))
 
-linearSVC = make_pipeline(StandardScaler(), LinearSVC(dual=False, tol=1e-5))
+
+# Will create multiple different SVC and Logistic Regression models to see the effect of tuning parameters
+
+linearSVC = make_pipeline(StandardScaler(), SVC(kernel="linear"))
 linearSVC.fit(X, y)
 
-logisticRegression = make_pipeline(StandardScaler(), LogisticRegression())
-logisticRegression.fit(X, y)
+polySVC = make_pipeline(StandardScaler(), SVC(kernel="poly"))
+polySVC.fit(X, y)
 
-print("SVC model accuracy: " + str(SVC.score(Xdev, ydev)))
-print("linearSVC model accuracy: " + str(linearSVC.score(Xdev, ydev)))
-print("Logistic Regression model accuracy: " + str(logisticRegression.score(Xdev, ydev)))
+rbfSVC = make_pipeline(StandardScaler(), SVC(kernel="rbf"))
+rbfSVC.fit(X, y)
+
+sigmoidSVC = make_pipeline(StandardScaler(), SVC(kernel="sigmoid"))
+sigmoidSVC.fit(X, y)
+
+print("SVC linear model accuracy: " + str(linearSVC.score(Xdev, ydev)))
+print("SVC poly model accuracy: " + str(polySVC.score(Xdev, ydev)))
+print("SVC rbf model accuracy: " + str(rbfSVC.score(Xdev, ydev)))
+print("SVC sigmoid model accuracy: " + str(sigmoidSVC.score(Xdev, ydev)))
+
+
+l1logisticRegression = make_pipeline(StandardScaler(), LogisticRegression(penalty="l1", solver="liblinear"))
+l1logisticRegression.fit(X, y)
+
+l2logisticRegression = make_pipeline(StandardScaler(), LogisticRegression(penalty="l2", solver="liblinear"))
+l2logisticRegression.fit(X, y)
+
+elasticlogisticRegression = make_pipeline(StandardScaler(), LogisticRegression(penalty="elasticnet", solver="saga", l1_ratio=0.5))
+elasticlogisticRegression.fit(X, y)
+
+nonelogisticRegression = make_pipeline(StandardScaler(), LogisticRegression(penalty="none", solver="newton-cg"))
+nonelogisticRegression.fit(X, y)
+
+
+print("Logistic Regression l1 model accuracy: " + str(l1logisticRegression.score(Xdev, ydev)))
+print("Logistic Regression l2 model accuracy: " + str(l2logisticRegression.score(Xdev, ydev)))
+print("Logistic Regression elasticnet model accuracy: " + str(elasticlogisticRegression.score(Xdev, ydev)))
+print("Logistic Regression none model accuracy: " + str(nonelogisticRegression.score(Xdev, ydev)))
