@@ -68,20 +68,37 @@ def datapreprocess(filename):
 
 
 def bleu_score(sentence1array, sentence2array):
-    features = pd.DataFrame(columns=["BLEU_SCORES"])
-    bleu_scores = []
+    features = pd.DataFrame(columns=["BLEU_1", "BLEU_2", "BLEU_3", "BLEU_4"])
+    bleu1 = []
+    bleu2 = []
+    bleu3 = []
+    bleu4 = []
+
     smooth = SmoothingFunction()
     for (sentence_1, sentence_2) in itertools.zip_longest(sentence1array, sentence2array):
         first_sentence = nltk.word_tokenize(sentence_1)
         second_sentence = nltk.word_tokenize(sentence_2)
-        bleu_scores.append(round(nltk.translate.bleu_score.sentence_bleu([first_sentence], second_sentence,
-                                                                         smoothing_function=smooth.method3)))
-    features["BLEU_SCORES"] = bleu_scores
+        bleu1.append(nltk.translate.bleu_score.sentence_bleu([first_sentence], second_sentence, weights=[1]))
+        bleu2.append(nltk.translate.bleu_score.sentence_bleu([first_sentence], second_sentence,
+                                                                   smoothing_function=smooth.method3,
+                                                                   weights=[0.5, 0.5]))
+        bleu3.append(nltk.translate.bleu_score.sentence_bleu([first_sentence], second_sentence,
+                                                                   smoothing_function=smooth.method3,
+                                                                   weights=[1 / 3, 1 / 3, 1 / 3]))
+        bleu4.append(nltk.translate.bleu_score.sentence_bleu([first_sentence], second_sentence,
+                                                                   smoothing_function=smooth.method3,
+                                                                   weights=[1 / 4, 1 / 4, 1 / 4, 1 / 4]))
+
+    features["BLEU_1"] = bleu1
+    features["BLEU_2"] = bleu2
+    features["BLEU_3"] = bleu3
+    features["BLEU_4"] = bleu4
+
     return features
 
 
 def feature_extractor(sentence1array, sentence2array):
-    features = pd.DataFrame(columns=["Length Comparison", "Union", "Proportion of Matching Words", "bleu_score"])
+    features = pd.DataFrame(columns=["Length Comparison", "Union", "Proportion of Matching Words"])
 
     # Length Dissimilarity: If one is much shorter or longer, it will be a higher value
     length = []
@@ -153,7 +170,7 @@ def feature_extractor(sentence1array, sentence2array):
     # features['3grams'] = threegrams
     # features['4grams'] = fourgrams
 
-    features["bleu_score"] = bleu_score(sentence1array, sentence2array)
+    # features["bleu_score"] = bleu_score(sentence1array, sentence2array)
     # synonyms and hypernyms to be implemented later, want to focus on getting some level of output first
 
     return features
@@ -164,11 +181,11 @@ def vectorize_features(sentence1array, sentence2array):
 
 
 training_data = datapreprocess("train_with_label.txt")
-X = feature_extractor(training_data["Sentence_1"], training_data["Sentence_2"])
+X = bleu_score(training_data["Sentence_1"], training_data["Sentence_2"])
 y = training_data["Output"]
 
 dev_data = datapreprocess("dev_with_label.txt")
-Xdev = feature_extractor(dev_data["Sentence_1"], dev_data["Sentence_2"])
+Xdev = bleu_score(dev_data["Sentence_1"], dev_data["Sentence_2"])
 ydev = dev_data["Output"]
 
 # SVC = make_pipeline(StandardScaler(), SVC(kernel="sigmoid"))
@@ -187,16 +204,16 @@ ydev = dev_data["Output"]
 
 # Will create multiple different SVC and Logistic Regression models to see the effect of tuning parameters
 
-linearSVC = make_pipeline(StandardScaler(), SVC(kernel="linear"))
+linearSVC = make_pipeline(MinMaxScaler(), SVC(kernel="linear"))
 linearSVC.fit(X, y)
 
-polySVC = make_pipeline(StandardScaler(), SVC(kernel="poly"))
+polySVC = make_pipeline(MinMaxScaler(), SVC(kernel="poly"))
 polySVC.fit(X, y)
 
-rbfSVC = make_pipeline(StandardScaler(), SVC(kernel="rbf"))
+rbfSVC = make_pipeline(MinMaxScaler(), SVC(kernel="rbf"))
 rbfSVC.fit(X, y)
 
-sigmoidSVC = make_pipeline(StandardScaler(), SVC(kernel="sigmoid"))
+sigmoidSVC = make_pipeline(MinMaxScaler(), SVC(kernel="sigmoid"))
 sigmoidSVC.fit(X, y)
 
 print("SVC linear model accuracy: " + str(linearSVC.score(Xdev, ydev)))
@@ -204,19 +221,18 @@ print("SVC poly model accuracy: " + str(polySVC.score(Xdev, ydev)))
 print("SVC rbf model accuracy: " + str(rbfSVC.score(Xdev, ydev)))
 print("SVC sigmoid model accuracy: " + str(sigmoidSVC.score(Xdev, ydev)))
 
-
-l1logisticRegression = make_pipeline(StandardScaler(), LogisticRegression(penalty="l1", solver="liblinear"))
+l1logisticRegression = make_pipeline(MinMaxScaler(), LogisticRegression(penalty="l1", solver="liblinear"))
 l1logisticRegression.fit(X, y)
 
-l2logisticRegression = make_pipeline(StandardScaler(), LogisticRegression(penalty="l2", solver="liblinear"))
+l2logisticRegression = make_pipeline(MinMaxScaler(), LogisticRegression(penalty="l2", solver="liblinear"))
 l2logisticRegression.fit(X, y)
 
-elasticlogisticRegression = make_pipeline(StandardScaler(), LogisticRegression(penalty="elasticnet", solver="saga", l1_ratio=0.5))
+elasticlogisticRegression = make_pipeline(MinMaxScaler(),
+                                          LogisticRegression(penalty="elasticnet", solver="saga", l1_ratio=0.5))
 elasticlogisticRegression.fit(X, y)
 
-nonelogisticRegression = make_pipeline(StandardScaler(), LogisticRegression(penalty="none", solver="newton-cg"))
+nonelogisticRegression = make_pipeline(MinMaxScaler(), LogisticRegression(penalty="none", solver="newton-cg"))
 nonelogisticRegression.fit(X, y)
-
 
 print("Logistic Regression l1 model accuracy: " + str(l1logisticRegression.score(Xdev, ydev)))
 print("Logistic Regression l2 model accuracy: " + str(l2logisticRegression.score(Xdev, ydev)))
