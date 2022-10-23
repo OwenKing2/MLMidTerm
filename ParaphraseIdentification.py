@@ -145,10 +145,12 @@ def meteor_scores(sentence1array, sentence2array):
 
 
 def baseline_features(sentence1array, sentence2array):
-    features = pd.DataFrame(columns=["NIST_1", "NIST_2", "NIST_3", "NIST_4", "NIST_5",
-                                     "BLEU_1", "BLEU_2", "BLEU_3", "BLEU_4",
-                                     "Cosine Similarity",
-                                     "Meteor Score"])
+    features = pd.DataFrame(columns=[
+        # "NIST_1", "NIST_2", "NIST_3", "NIST_4", "NIST_5",
+        "BLEU_1", "BLEU_2", "BLEU_3",
+        "BLEU_4",
+        "Cosine Similarity",
+        "Meteor Score"])
     nist_scores = nist_score(sentence1array, sentence2array)
     bleu_scores = bleu_score(sentence1array, sentence2array)
 
@@ -157,11 +159,11 @@ def baseline_features(sentence1array, sentence2array):
     features["BLEU_3"] = bleu_scores["BLEU_3"]
     features["BLEU_4"] = bleu_scores["BLEU_4"]
 
-    features["NIST_1"] = nist_scores["NIST_1"]
-    features["NIST_2"] = nist_scores["NIST_2"]
-    features["NIST_3"] = nist_scores["NIST_3"]
-    features["NIST_4"] = nist_scores["NIST_4"]
-    features["NIST_5"] = nist_scores["NIST_5"]
+    # features["NIST_1"] = nist_scores["NIST_1"]
+    # features["NIST_2"] = nist_scores["NIST_2"]
+    # features["NIST_3"] = nist_scores["NIST_3"]
+    # features["NIST_4"] = nist_scores["NIST_4"]
+    # features["NIST_5"] = nist_scores["NIST_5"]
 
     features["Cosine Similarity"] = vectorize_features(sentence1array, sentence2array)
     features["Meteor Score"] = meteor_scores(sentence1array, sentence2array)
@@ -312,15 +314,93 @@ def meteor_and_vector(sentence1array, sentence2array):
     return features
 
 
+def character_bigrams_features(sentence1array, sentence2array):
+    features = pd.DataFrame(columns=["Character Bigram Union", "Character Bigram Intersection",
+                                     "NumBigrams1", "NumBigrams2"])
+    bigramUnion = []
+    bigramIntersection = []
+    numbigrams1 = []
+    numbigrams2 = []
+
+    for (sentence_1, sentence_2) in itertools.zip_longest(sentence1array, sentence2array):
+        sentence_1_no_spaces = sentence_1.replace(" ", "")
+        sentence_2_no_spaces = sentence_2.replace(" ", "")
+        sentence_1_char_bigrams = [sentence_1_no_spaces[i:i + 2] for i in range(len(sentence_1_no_spaces) - 1)]
+        sentence_2_char_bigrams = [sentence_2_no_spaces[i:i + 2] for i in range(len(sentence_2_no_spaces) - 1)]
+        bigram_matches = 0
+        for phrase in sentence_1_char_bigrams:
+            if phrase in sentence_2_char_bigrams:
+                bigram_matches += 1
+        bigramIntersection.append(bigram_matches)
+        bigramUnion.append(len(sentence_1_char_bigrams) + len(sentence_2_char_bigrams))
+        numbigrams1.append(len(sentence_1_char_bigrams))
+        numbigrams2.append(len(sentence_2_char_bigrams))
+    features["Character Bigram Union"] = bigramUnion
+    features["Character Bigram Intersection"] = bigramIntersection
+    features["NumBigrams1"] = numbigrams1
+    features["NumBigrams2"] = numbigrams2
+
+    return features
+
+
+def word_unigram_features(sentence1array, sentence2array):
+    features = pd.DataFrame(columns=["Sentence Unigram Union", "Sentence Unigram Intersection",
+                                     "NumUnigrams1", "NumUnigrams2"])
+    unigramUnion = []
+    unigramIntersection = []
+    numunigrams1 = []
+    numunigrams2 = []
+
+    for (sentence_1, sentence_2) in itertools.zip_longest(sentence1array, sentence2array):
+        sentence_1_words = nltk.word_tokenize(sentence_1)
+        sentence_2_words = nltk.word_tokenize(sentence_2)
+        sentence_1_unigrams = list(nltk.ngrams(sentence_1_words, 1))
+        sentence_2_unigrams = list(nltk.ngrams(sentence_1_words, 1))
+        unigram_matches = 0
+        for phrase in sentence_1_unigrams:
+            if phrase in sentence_2_unigrams:
+                unigram_matches += 1
+        unigramIntersection.append(unigram_matches)
+        unigramUnion.append(len(sentence_1_unigrams) + len(sentence_2_unigrams))
+        numunigrams1.append(len(sentence_1_unigrams))
+        numunigrams2.append(len(sentence_2_unigrams))
+    features["Sentence Unigram Union"] = unigramUnion
+    features["Sentence Unigram Intersection"] = unigramIntersection
+    features["NumUnigrams1"] = numunigrams1
+    features["NumUnigrams2"] = numunigrams2
+    return features
+
+
+def charBigramWordUnigram(sentence1array, sentence2array):
+    features = pd.DataFrame(columns=[
+        "Sentence Unigram Union", "Sentence Unigram Intersection", "NumUnigrams1", "NumUnigrams2",
+        "Character Bigram Union", "Character Bigram Intersection", "NumBigrams1", "NumBigrams2"
+    ])
+    charBigramFeatures = character_bigrams_features(sentence1array,sentence2array)
+    wordUnigramFeatures = word_unigram_features(sentence1array,sentence2array)
+
+    features["Character Bigram Union"] = charBigramFeatures["Character Bigram Union"]
+    features["Character Bigram Intersection"] = charBigramFeatures["Character Bigram Intersection"]
+    features["NumBigrams1"] = charBigramFeatures["NumBigrams1"]
+    features["NumBigrams2"] = charBigramFeatures["NumBigrams2"]
+
+    features["Sentence Unigram Union"] = wordUnigramFeatures["Sentence Unigram Union"]
+    features["Sentence Unigram Intersection"] = wordUnigramFeatures["Sentence Unigram Intersection"]
+    features["NumUnigrams1"] = wordUnigramFeatures["NumUnigrams1"]
+    features["NumUnigrams2"] = wordUnigramFeatures["NumUnigrams2"]
+
+    return features
+
+
 training_data = simplified_preprocessing("train_with_label.txt")
-X = baseline_features(training_data["Sentence_1"], training_data["Sentence_2"])
+X = charBigramWordUnigram(training_data["Sentence_1"], training_data["Sentence_2"])
 y = training_data["Output"]
 
 dev_data = simplified_preprocessing("dev_with_label.txt")
-Xdev = baseline_features(dev_data["Sentence_1"], dev_data["Sentence_2"])
+Xdev = charBigramWordUnigram(dev_data["Sentence_1"], dev_data["Sentence_2"])
 ydev = dev_data["Output"]
 
-# Optimized Logistic Regression Model
+# Code to find the optimal Logistic Regression Model
 
 std_slc = StandardScaler()
 pca = decomposition.PCA()
@@ -328,40 +408,24 @@ logModel = LogisticRegression()
 pipe = sklearn.pipeline.Pipeline(steps=[('std_slc', std_slc),
                                         ('pca', pca),
                                         ('logistic_Reg', logModel)])
-n_components = list(range(1, X.shape[1]+1, 1))
-C = np.logspace(-4, 4, 50)
-penalty = ['l1', 'l2', 'elasticnet', 'none']
+n_components = list(range(1, X.shape[1] + 1, 1))
+penalty = 'none',
 solver = ['newton-cg', 'lbfgs', 'liblinear', 'sag', 'saga']
 parameters = dict(pca__n_components=n_components,
-                  logistic_Reg__C=C,
                   logistic_Reg__solver=solver,
                   logistic_Reg__penalty=penalty)
 
-# clf_GS = GridSearchCV(pipe, parameters)
-# clf_GS.fit(X, y)
-#
-# print('Best Penalty:', clf_GS.best_estimator_.get_params()['logistic_Reg__penalty'])
-# print('Best C:', clf_GS.best_estimator_.get_params()['logistic_Reg__C'])
-# print('Best Number Of Components:', clf_GS.best_estimator_.get_params()['pca__n_components'])
-# print(clf_GS.best_estimator_.get_params()['logistic_Reg'])
-# print("Optimized logistic regression model accuracy:" + str(clf_GS.score(Xdev, ydev)))
+clf_GS = GridSearchCV(pipe, parameters)
+clf_GS.fit(X, y)
 
-# matchingLogReg = make_pipeline(StandardScaler(), LogisticRegression(penalty='none', C='0.0001', ))
-# param_grid = [
-#     {'penalty': ['l1', 'l2', 'elasticnet', 'none'],
-#      'C': np.logspace(-4, 4, 50),
-#      # 'solver': ['lbfgs', 'newton-cg', 'liblinear', 'sag', 'saga']
-#      # 'max_iter': [100, 1000, 2500, 5000]
-#      }
-# ]
+print('Best Penalty:', clf_GS.best_estimator_.get_params()['logistic_Reg__penalty'])
+print('Best C:', clf_GS.best_estimator_.get_params()['logistic_Reg__C'])
+print('Best Number Of Components:', clf_GS.best_estimator_.get_params()['pca__n_components'])
+print(clf_GS.best_estimator_.get_params()['logistic_Reg'])
+print("Optimized logistic regression model accuracy:" + str(clf_GS.score(Xdev, ydev)))
 
-# clf = make_pipeline(StandardScaler(), GridSearchCV(logModel, param_grid=param_grid, cv=3, verbose=True, n_jobs=-1))
-# clf.fit(X, y)
-#
-# # print(clf.best_params_)
-# print("Optimized Logistic Regression Model Accuracy:" + str(clf.score(Xdev, ydev)))
-
-nonelogisticRegression = make_pipeline(StandardScaler(), LogisticRegression(penalty="none", solver="newton-cg"))
+nonelogisticRegression = make_pipeline(StandardScaler(), decomposition.PCA(n_components=3),
+                                       LogisticRegression(penalty="none", solver="newton-cg"))
 nonelogisticRegression.fit(X, y)
 
 print("None Logistic Regression Model Accuracy:" + str(nonelogisticRegression.score(Xdev, ydev)))
