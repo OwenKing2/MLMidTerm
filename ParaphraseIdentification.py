@@ -1,27 +1,13 @@
-import numpy as np
-import pandas as pd
-import sklearn.preprocessing
-from IPython.display import display
-from tabulate import tabulate
-from sklearn.svm import SVC, LinearSVC
-from sklearn.linear_model import SGDClassifier, LogisticRegression
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
-from sklearn.naive_bayes import MultinomialNB
-from sklearn.ensemble import RandomForestClassifier
-from sklearn import preprocessing
-from sklearn.metrics import accuracy_score
-from sklearn.pipeline import make_pipeline
-from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
-import nltk
-from nltk.corpus import stopwords
-from nltk.stem.wordnet import WordNetLemmatizer
-from nltk.stem import wordnet
-import math
-from sklearn.feature_extraction.text import CountVectorizer
-from collections import defaultdict
-import codecs
-import string
 import itertools
+import string
+
+import nltk
+import pandas as pd
+from nltk.corpus import stopwords
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
 
 
 def datapreprocess(filename):
@@ -116,25 +102,14 @@ def nist_score(sentence1array, sentence2array):
     nist4 = []
     nist5 = []
 
-    smooth = SmoothingFunction()
     for (sentence_1, sentence_2) in itertools.zip_longest(sentence1array, sentence2array):
         first_sentence = nltk.word_tokenize(sentence_1)
         second_sentence = nltk.word_tokenize(sentence_2)
-        nist1.append(nltk.translate.bleu_score.sentence_bleu([first_sentence], second_sentence,
-                                                             smoothing_function=smooth.method3,
-                                                             weights=[1]))
-        nist2.append(nltk.translate.bleu_score.sentence_bleu([first_sentence], second_sentence,
-                                                             smoothing_function=smooth.method3,
-                                                             weights=[0.5, 0.5]))
-        nist3.append(nltk.translate.bleu_score.sentence_bleu([first_sentence], second_sentence,
-                                                             smoothing_function=smooth.method3,
-                                                             weights=[1 / 3, 1 / 3, 1 / 3]))
-        nist4.append(nltk.translate.bleu_score.sentence_bleu([first_sentence], second_sentence,
-                                                             smoothing_function=smooth.method3,
-                                                             weights=[1 / 4, 1 / 4, 1 / 4, 1 / 4]))
-        nist5.append(nltk.translate.bleu_score.sentence_bleu([first_sentence], second_sentence,
-                                                             smoothing_function=smooth.method3,
-                                                             weights=[1 / 5, 1 / 5, 1 / 5, 1 / 5, 1 / 5]))
+        nist1.append(nltk.translate.nist_score.sentence_nist([first_sentence], second_sentence, n=1))
+        nist2.append(nltk.translate.nist_score.sentence_nist([first_sentence], second_sentence, n=2))
+        nist3.append(nltk.translate.nist_score.sentence_nist([first_sentence], second_sentence, n=3))
+        nist4.append(nltk.translate.nist_score.sentence_nist([first_sentence], second_sentence, n=4))
+        nist5.append(nltk.translate.nist_score.sentence_nist([first_sentence], second_sentence, n=5))
 
     features["NIST_1"] = nist1
     features["NIST_2"] = nist2
@@ -145,7 +120,19 @@ def nist_score(sentence1array, sentence2array):
     return features
 
 
-def bleu_nist(sentence1array, sentence2array):
+def meteor_scores(sentence1array, sentence2array):
+    features = pd.DataFrame(columns=["METEOR"])
+
+    meteor_score = []
+    for (sentence_1, sentence_2) in itertools.zip_longest(sentence1array, sentence2array):
+        first_sentence = nltk.word_tokenize(sentence_1)
+        second_sentence = nltk.word_tokenize(sentence_2)
+        meteor_score.append(nltk.translate.meteor_score.single_meteor_score(first_sentence, second_sentence))
+    features["METEOR"] = meteor_score
+    return features
+
+
+def combined_scores(sentence1array, sentence2array):
     features = pd.DataFrame(columns=["NIST_1", "NIST_2", "NIST_3", "NIST_4", "NIST_5",
                                      "BLEU_1", "BLEU_2", "BLEU_3", "BLEU_4"])
     nist_scores = nist_score(sentence1array, sentence2array)
@@ -167,7 +154,7 @@ def bleu_nist(sentence1array, sentence2array):
 def feature_extractor(sentence1array, sentence2array):
     features = pd.DataFrame(
         columns=["Length Comparison", "Union", "Proportion of Matching Words",
-                 "NIST_1", "NIST_2", "NIST_3", "NIST_4", "NIST_5"])
+                 "METEOR"])
 
     # Length Dissimilarity: If one is much shorter or longer, it will be a higher value
     length = []
@@ -239,12 +226,13 @@ def feature_extractor(sentence1array, sentence2array):
     # features['3grams'] = threegrams
     # features['4grams'] = fourgrams
 
-    nist_scores = nist_score(sentence1array, sentence2array)
-    features["NIST_1"] = nist_scores["NIST_1"]
-    features["NIST_2"] = nist_scores["NIST_2"]
-    features["NIST_3"] = nist_scores["NIST_3"]
-    features["NIST_4"] = nist_scores["NIST_4"]
-    features["NIST_5"] = nist_scores["NIST_5"]
+    features["METEOR"] = meteor_scores(sentence1array, sentence2array)
+    # nist_scores = nist_score(sentence1array, sentence2array)
+    # features["NIST_1"] = nist_scores["NIST_1"]
+    # features["NIST_2"] = nist_scores["NIST_2"]
+    # features["NIST_3"] = nist_scores["NIST_3"]
+    # features["NIST_4"] = nist_scores["NIST_4"]
+    # features["NIST_5"] = nist_scores["NIST_5"]
 
     # synonyms and hypernyms to be implemented later, want to focus on getting some level of output first
 
@@ -256,11 +244,11 @@ def vectorize_features(sentence1array, sentence2array):
 
 
 training_data = simplified_preprocessing("train_with_label.txt")
-X = bleu_nist(training_data["Sentence_1"], training_data["Sentence_2"])
+X = feature_extractor(training_data["Sentence_1"], training_data["Sentence_2"])
 y = training_data["Output"]
 
 dev_data = simplified_preprocessing("dev_with_label.txt")
-Xdev = bleu_nist(dev_data["Sentence_1"], dev_data["Sentence_2"])
+Xdev = feature_extractor(dev_data["Sentence_1"], dev_data["Sentence_2"])
 ydev = dev_data["Output"]
 
 # SVC = make_pipeline(StandardScaler(), SVC(kernel="sigmoid"))
