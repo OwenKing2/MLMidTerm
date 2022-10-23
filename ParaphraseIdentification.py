@@ -2,12 +2,21 @@ import itertools
 import string
 
 import nltk
+import numpy as np
 import pandas as pd
 from nltk.corpus import stopwords
+from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
+from sklearn.metrics.pairwise import cosine_similarity
+import spacy
+import en_core_web_sm
+
+
+# import warnings
+# warnings.filterwarnings(action = 'ignore')
 
 
 def datapreprocess(filename):
@@ -161,7 +170,13 @@ def feature_extractor(sentence1array, sentence2array):
     for (sentence_1, sentence_2) in itertools.zip_longest(sentence1array, sentence2array):
         length.append(abs(len(sentence_1) - len(sentence_2)) / ((len(sentence_1) + len(sentence_2)) / 2))
     features['Length Comparison'] = length
-
+    # length_1 = []
+    # length_2 = []
+    # for (sentence_1, sentence_2) in itertools.zip_longest(sentence1array, sentence2array):
+    #     length_1.append(len(sentence_1))
+    #     length_2.append(len(sentence_2))
+    # features["Length One"] = length_1
+    # features["Length Two"] = length_2
     # Union: a feature for total number of unique tokens, so that matching words aren't favored too highly
     # for longer sentences, which could naturally have more
 
@@ -240,15 +255,60 @@ def feature_extractor(sentence1array, sentence2array):
 
 
 def vectorize_features(sentence1array, sentence2array):
-    return []
+    # features = pd.DataFrame(columns=["Word Union", "Word Intersection", "Word 1 Length", "Word 2 Length",
+    #                                 "Bigram Union", "Bigram Intersection", "Bigram 1 Length", "Bigram 2 Length"])
+
+    features = pd.DataFrame(columns=["Sentence Cosine Similarity"])
+    # sentence1list = []
+    # sentence2list = []
+    sentence1vectors = []
+    sentence2vectors = []
+    embeddings = spacy.load('en_core_web_sm')
+
+    for sentence in sentence1array:
+        # sentence1list.append(sentence)
+        sentence1vectors.append(embeddings(sentence).vector)
+    for sentence in sentence2array:
+        # sentence2list.append(sentence)
+        sentence2vectors.append(embeddings(sentence).vector)
+    cosinesim = []
+    for (vector_1, vector_2) in itertools.zip_longest(sentence1vectors, sentence2vectors):
+        cosinesim.append(cosine_similarity([vector_1], [vector_2]))
+    features["Sentence Cosine Similarity"] = cosinesim
+
+    return features
+
+
+def meteor_and_vector(sentence1array, sentence2array):
+    features = pd.DataFrame(columns=["Sentence Cosine Similarity", "Meteor Score", "Length Comparison", "Union",
+                                     "Proportion of Matching Words"])
+    features["Meteor Score"] = meteor_scores(sentence1array, sentence2array)
+    features["Sentence Cosine Similarity"] = vectorize_features(sentence1array, sentence2array)
+    length = []
+    for (sentence_1, sentence_2) in itertools.zip_longest(sentence1array, sentence2array):
+        length.append(abs(len(sentence_1) - len(sentence_2)) / ((len(sentence_1) + len(sentence_2)) / 2))
+    features['Length Comparison'] = length
+    matching = []
+    union = []
+    for (sentence_1, sentence_2) in itertools.zip_longest(sentence1array, sentence2array):
+        combined_sentence = sentence_1 + sentence_2
+        unique_words = len(set(combined_sentence.split(' ')))
+        sentence_1_words = sentence_1.split(" ")
+        sentence_2_words = sentence_2.split(" ")
+        common_words = len(list(set(sentence_1_words) & set(sentence_2_words)))
+        matching.append(common_words)
+        union.append(unique_words)
+    features['Proportion of Matching Words'] = matching
+    features['Union'] = union
+    return features
 
 
 training_data = simplified_preprocessing("train_with_label.txt")
-X = feature_extractor(training_data["Sentence_1"], training_data["Sentence_2"])
+X = meteor_and_vector(training_data["Sentence_1"], training_data["Sentence_2"])
 y = training_data["Output"]
 
 dev_data = simplified_preprocessing("dev_with_label.txt")
-Xdev = feature_extractor(dev_data["Sentence_1"], dev_data["Sentence_2"])
+Xdev = meteor_and_vector(dev_data["Sentence_1"], dev_data["Sentence_2"])
 ydev = dev_data["Output"]
 
 # SVC = make_pipeline(StandardScaler(), SVC(kernel="sigmoid"))
