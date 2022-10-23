@@ -151,7 +151,8 @@ def all_features(sentence1array, sentence2array):
         "BLEU_1", "BLEU_2", "BLEU_3", "BLEU_4",
         "Cosine Similarity",
         "Meteor Score",
-        "Character Bigram Union", "Character Bigram Intersection", "NumBigrams1", "NumBigrams2"
+        "Character Bigram Union", "Character Bigram Intersection", "NumBigrams1", "NumBigrams2",
+        "Sentence Unigram Union", "Sentence Unigram Intersection", "NumUnigrams1", "NumUnigrams2"
     ])
     nist_scores = nist_score(sentence1array, sentence2array)
     bleu_scores = bleu_score(sentence1array, sentence2array)
@@ -175,6 +176,13 @@ def all_features(sentence1array, sentence2array):
     features["Character Bigram Intersection"] = charBigramFeatures["Character Bigram Intersection"]
     features["NumBigrams1"] = charBigramFeatures["NumBigrams1"]
     features["NumBigrams2"] = charBigramFeatures["NumBigrams2"]
+
+    wordUnigramFeatures = word_unigram_features(sentence1array, sentence2array)
+    features["Sentence Unigram Union"] = wordUnigramFeatures["Sentence Unigram Union"]
+    features["Sentence Unigram Intersection"] = wordUnigramFeatures["Sentence Unigram Intersection"]
+    features["NumUnigrams1"] = wordUnigramFeatures["NumUnigrams1"]
+    features["NumUnigrams2"] = wordUnigramFeatures["NumUnigrams2"]
+
     return features
 
 
@@ -362,7 +370,7 @@ def word_unigram_features(sentence1array, sentence2array):
         sentence_1_words = nltk.word_tokenize(sentence_1)
         sentence_2_words = nltk.word_tokenize(sentence_2)
         sentence_1_unigrams = list(nltk.ngrams(sentence_1_words, 1))
-        sentence_2_unigrams = list(nltk.ngrams(sentence_1_words, 1))
+        sentence_2_unigrams = list(nltk.ngrams(sentence_2_words, 1))
         unigram_matches = 0
         for phrase in sentence_1_unigrams:
             if phrase in sentence_2_unigrams:
