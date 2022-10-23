@@ -144,13 +144,15 @@ def meteor_scores(sentence1array, sentence2array):
     return features
 
 
-def baseline_features(sentence1array, sentence2array):
+# Currently my highest accuracy (with NIST features removed acc ~64%
+def all_features(sentence1array, sentence2array):
     features = pd.DataFrame(columns=[
-        # "NIST_1", "NIST_2", "NIST_3", "NIST_4", "NIST_5",
-        "BLEU_1", "BLEU_2", "BLEU_3",
-        "BLEU_4",
+    #    "NIST_1", "NIST_2", "NIST_3", "NIST_4", "NIST_5",
+        "BLEU_1", "BLEU_2", "BLEU_3", "BLEU_4",
         "Cosine Similarity",
-        "Meteor Score"])
+        "Meteor Score",
+        "Character Bigram Union", "Character Bigram Intersection", "NumBigrams1", "NumBigrams2"
+    ])
     nist_scores = nist_score(sentence1array, sentence2array)
     bleu_scores = bleu_score(sentence1array, sentence2array)
 
@@ -168,6 +170,11 @@ def baseline_features(sentence1array, sentence2array):
     features["Cosine Similarity"] = vectorize_features(sentence1array, sentence2array)
     features["Meteor Score"] = meteor_scores(sentence1array, sentence2array)
 
+    charBigramFeatures = character_bigrams_features(sentence1array, sentence2array)
+    features["Character Bigram Union"] = charBigramFeatures["Character Bigram Union"]
+    features["Character Bigram Intersection"] = charBigramFeatures["Character Bigram Intersection"]
+    features["NumBigrams1"] = charBigramFeatures["NumBigrams1"]
+    features["NumBigrams2"] = charBigramFeatures["NumBigrams2"]
     return features
 
 
@@ -373,31 +380,35 @@ def word_unigram_features(sentence1array, sentence2array):
 
 def charBigramWordUnigram(sentence1array, sentence2array):
     features = pd.DataFrame(columns=[
-        "Sentence Unigram Union", "Sentence Unigram Intersection", "NumUnigrams1", "NumUnigrams2",
-        "Character Bigram Union", "Character Bigram Intersection", "NumBigrams1", "NumBigrams2"
+        # "Sentence Unigram Union", "Sentence Unigram Intersection", "NumUnigrams1", "NumUnigrams2",
+        # "Character Bigram Union", "Character Bigram Intersection", "NumBigrams1", "NumBigrams2",
+        "Meteor Score",
+        "Cosine Similarity"
     ])
     charBigramFeatures = character_bigrams_features(sentence1array,sentence2array)
-    wordUnigramFeatures = word_unigram_features(sentence1array,sentence2array)
+    # wordUnigramFeatures = word_unigram_features(sentence1array,sentence2array)
 
-    features["Character Bigram Union"] = charBigramFeatures["Character Bigram Union"]
-    features["Character Bigram Intersection"] = charBigramFeatures["Character Bigram Intersection"]
-    features["NumBigrams1"] = charBigramFeatures["NumBigrams1"]
-    features["NumBigrams2"] = charBigramFeatures["NumBigrams2"]
+    # features["Character Bigram Union"] = charBigramFeatures["Character Bigram Union"]
+    # features["Character Bigram Intersection"] = charBigramFeatures["Character Bigram Intersection"]
+    # features["NumBigrams1"] = charBigramFeatures["NumBigrams1"]
+    # features["NumBigrams2"] = charBigramFeatures["NumBigrams2"]
 
-    features["Sentence Unigram Union"] = wordUnigramFeatures["Sentence Unigram Union"]
-    features["Sentence Unigram Intersection"] = wordUnigramFeatures["Sentence Unigram Intersection"]
-    features["NumUnigrams1"] = wordUnigramFeatures["NumUnigrams1"]
-    features["NumUnigrams2"] = wordUnigramFeatures["NumUnigrams2"]
+    # features["Sentence Unigram Union"] = wordUnigramFeatures["Sentence Unigram Union"]
+    # features["Sentence Unigram Intersection"] = wordUnigramFeatures["Sentence Unigram Intersection"]
+    # features["NumUnigrams1"] = wordUnigramFeatures["NumUnigrams1"]
+    # features["NumUnigrams2"] = wordUnigramFeatures["NumUnigrams2"]
+    features["Meteor Score"] = meteor_scores(sentence1array, sentence2array)
+    features["Cosine Similarity"] = vectorize_features(sentence1array, sentence2array)
 
     return features
 
 
 training_data = simplified_preprocessing("train_with_label.txt")
-X = charBigramWordUnigram(training_data["Sentence_1"], training_data["Sentence_2"])
+X = all_features(training_data["Sentence_1"], training_data["Sentence_2"])
 y = training_data["Output"]
 
 dev_data = simplified_preprocessing("dev_with_label.txt")
-Xdev = charBigramWordUnigram(dev_data["Sentence_1"], dev_data["Sentence_2"])
+Xdev = all_features(dev_data["Sentence_1"], dev_data["Sentence_2"])
 ydev = dev_data["Output"]
 
 # Code to find the optimal Logistic Regression Model
@@ -424,7 +435,7 @@ print('Best Number Of Components:', clf_GS.best_estimator_.get_params()['pca__n_
 print(clf_GS.best_estimator_.get_params()['logistic_Reg'])
 print("Optimized logistic regression model accuracy:" + str(clf_GS.score(Xdev, ydev)))
 
-nonelogisticRegression = make_pipeline(StandardScaler(), decomposition.PCA(n_components=3),
+nonelogisticRegression = make_pipeline(StandardScaler(),
                                        LogisticRegression(penalty="none", solver="newton-cg"))
 nonelogisticRegression.fit(X, y)
 
