@@ -4,19 +4,22 @@ import string
 import nltk
 import numpy as np
 import pandas as pd
+import sklearn
 from nltk.corpus import stopwords
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.linear_model import LogisticRegression
-from sklearn.pipeline import make_pipeline
+from sklearn.pipeline import make_pipeline, Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 from sklearn.metrics.pairwise import cosine_similarity
 import spacy
+from sklearn import linear_model, decomposition
 import en_core_web_sm
+from sklearn.model_selection import GridSearchCV
 
+import warnings
 
-# import warnings
-# warnings.filterwarnings(action = 'ignore')
+warnings.filterwarnings(action='ignore')
 
 
 def datapreprocess(filename):
@@ -141,9 +144,11 @@ def meteor_scores(sentence1array, sentence2array):
     return features
 
 
-def combined_scores(sentence1array, sentence2array):
+def baseline_features(sentence1array, sentence2array):
     features = pd.DataFrame(columns=["NIST_1", "NIST_2", "NIST_3", "NIST_4", "NIST_5",
-                                     "BLEU_1", "BLEU_2", "BLEU_3", "BLEU_4"])
+                                     "BLEU_1", "BLEU_2", "BLEU_3", "BLEU_4",
+                                     "Cosine Similarity",
+                                     "Meteor Score"])
     nist_scores = nist_score(sentence1array, sentence2array)
     bleu_scores = bleu_score(sentence1array, sentence2array)
 
@@ -157,6 +162,10 @@ def combined_scores(sentence1array, sentence2array):
     features["NIST_3"] = nist_scores["NIST_3"]
     features["NIST_4"] = nist_scores["NIST_4"]
     features["NIST_5"] = nist_scores["NIST_5"]
+
+    features["Cosine Similarity"] = vectorize_features(sentence1array, sentence2array)
+    features["Meteor Score"] = meteor_scores(sentence1array, sentence2array)
+
     return features
 
 
@@ -304,60 +313,55 @@ def meteor_and_vector(sentence1array, sentence2array):
 
 
 training_data = simplified_preprocessing("train_with_label.txt")
-X = meteor_and_vector(training_data["Sentence_1"], training_data["Sentence_2"])
+X = baseline_features(training_data["Sentence_1"], training_data["Sentence_2"])
 y = training_data["Output"]
 
 dev_data = simplified_preprocessing("dev_with_label.txt")
-Xdev = meteor_and_vector(dev_data["Sentence_1"], dev_data["Sentence_2"])
+Xdev = baseline_features(dev_data["Sentence_1"], dev_data["Sentence_2"])
 ydev = dev_data["Output"]
 
-# SVC = make_pipeline(StandardScaler(), SVC(kernel="sigmoid"))
-# SVC.fit(X, y)
+# Optimized Logistic Regression Model
+
+std_slc = StandardScaler()
+pca = decomposition.PCA()
+logModel = LogisticRegression()
+pipe = sklearn.pipeline.Pipeline(steps=[('std_slc', std_slc),
+                                        ('pca', pca),
+                                        ('logistic_Reg', logModel)])
+n_components = list(range(1, X.shape[1]+1, 1))
+C = np.logspace(-4, 4, 50)
+penalty = ['l1', 'l2', 'elasticnet', 'none']
+solver = ['newton-cg', 'lbfgs', 'liblinear', 'sag', 'saga']
+parameters = dict(pca__n_components=n_components,
+                  logistic_Reg__C=C,
+                  logistic_Reg__solver=solver,
+                  logistic_Reg__penalty=penalty)
+
+# clf_GS = GridSearchCV(pipe, parameters)
+# clf_GS.fit(X, y)
 #
-# # linearSVC = make_pipeline(StandardScaler(), LinearSVC(dual=False, tol=1e-5))
-# # linearSVC.fit(X, y)
+# print('Best Penalty:', clf_GS.best_estimator_.get_params()['logistic_Reg__penalty'])
+# print('Best C:', clf_GS.best_estimator_.get_params()['logistic_Reg__C'])
+# print('Best Number Of Components:', clf_GS.best_estimator_.get_params()['pca__n_components'])
+# print(clf_GS.best_estimator_.get_params()['logistic_Reg'])
+# print("Optimized logistic regression model accuracy:" + str(clf_GS.score(Xdev, ydev)))
+
+# matchingLogReg = make_pipeline(StandardScaler(), LogisticRegression(penalty='none', C='0.0001', ))
+# param_grid = [
+#     {'penalty': ['l1', 'l2', 'elasticnet', 'none'],
+#      'C': np.logspace(-4, 4, 50),
+#      # 'solver': ['lbfgs', 'newton-cg', 'liblinear', 'sag', 'saga']
+#      # 'max_iter': [100, 1000, 2500, 5000]
+#      }
+# ]
+
+# clf = make_pipeline(StandardScaler(), GridSearchCV(logModel, param_grid=param_grid, cv=3, verbose=True, n_jobs=-1))
+# clf.fit(X, y)
 #
-# logisticRegression = make_pipeline(StandardScaler(), LogisticRegression())
-# logisticRegression.fit(X, y)
-#
-# print("SVC model accuracy: " + str(SVC.score(Xdev, ydev)))
-# # print("linearSVC model accuracy: " + str(linearSVC.score(Xdev, ydev)))
-# print("Logistic Regression model accuracy: " + str(logisticRegression.score(Xdev, ydev)))
-
-
-# Will create multiple different SVC and Logistic Regression models to see the effect of tuning parameters
-
-linearSVC = make_pipeline(StandardScaler(), SVC(kernel="linear"))
-linearSVC.fit(X, y)
-
-polySVC = make_pipeline(StandardScaler(), SVC(kernel="poly"))
-polySVC.fit(X, y)
-
-rbfSVC = make_pipeline(StandardScaler(), SVC(kernel="rbf"))
-rbfSVC.fit(X, y)
-
-sigmoidSVC = make_pipeline(StandardScaler(), SVC(kernel="sigmoid"))
-sigmoidSVC.fit(X, y)
-
-print("SVC linear model accuracy: " + str(linearSVC.score(Xdev, ydev)))
-print("SVC poly model accuracy: " + str(polySVC.score(Xdev, ydev)))
-print("SVC rbf model accuracy: " + str(rbfSVC.score(Xdev, ydev)))
-print("SVC sigmoid model accuracy: " + str(sigmoidSVC.score(Xdev, ydev)))
-
-l1logisticRegression = make_pipeline(StandardScaler(), LogisticRegression(penalty="l1", solver="liblinear"))
-l1logisticRegression.fit(X, y)
-
-l2logisticRegression = make_pipeline(StandardScaler(), LogisticRegression(penalty="l2", solver="liblinear"))
-l2logisticRegression.fit(X, y)
-
-# elasticlogisticRegression = make_pipeline(StandardScaler(),
-# LogisticRegression(penalty="elasticnet", solver="saga", l1_ratio=0.5))
-# elasticlogisticRegression.fit(X, y)
+# # print(clf.best_params_)
+# print("Optimized Logistic Regression Model Accuracy:" + str(clf.score(Xdev, ydev)))
 
 nonelogisticRegression = make_pipeline(StandardScaler(), LogisticRegression(penalty="none", solver="newton-cg"))
 nonelogisticRegression.fit(X, y)
 
-print("Logistic Regression l1 model accuracy: " + str(l1logisticRegression.score(Xdev, ydev)))
-print("Logistic Regression l2 model accuracy: " + str(l2logisticRegression.score(Xdev, ydev)))
-# print("Logistic Regression elasticnet model accuracy: " + str(elasticlogisticRegression.score(Xdev, ydev)))
-print("Logistic Regression none model accuracy: " + str(nonelogisticRegression.score(Xdev, ydev)))
+print("None Logistic Regression Model Accuracy:" + str(nonelogisticRegression.score(Xdev, ydev)))
