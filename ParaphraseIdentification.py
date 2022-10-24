@@ -18,6 +18,7 @@ import en_core_web_sm
 from sklearn.model_selection import GridSearchCV
 from sklearn.experimental import enable_halving_search_cv
 from sklearn.model_selection import HalvingGridSearchCV
+from itertools import product
 
 import warnings
 
@@ -149,18 +150,20 @@ def meteor_scores(sentence1array, sentence2array):
 # Currently my highest accuracy (with NIST features removed acc ~67%
 def all_features(sentence1array, sentence2array):
     features = pd.DataFrame(columns=[
-        # "NIST_1",
-        # "NIST_2",
-        # "NIST_3",
-        # "NIST_4",
-        # "NIST_5",
+        "NIST_1",
+        "NIST_2",
+        "NIST_3",
+        "NIST_4",
+        "NIST_5",
         "BLEU_1", "BLEU_2", "BLEU_3", "BLEU_4",
         "Cosine Similarity",
         "Meteor Score",
         "CharacterBigramUnion", "CharacterBigramIntersection", "NumCharBigrams1", "NumCharBigrams2",
-        "SentenceUnigramUnion", "SentenceUnigramIntersection", "NumSentUnigrams1", "NumSentUnigrams2"
+        "SentenceUnigramUnion", "SentenceUnigramIntersection", "NumSentUnigrams1", "NumSentUnigrams2",
+        "CharacterUnigramUnion", "CharacterUnigramIntersection", "NumCharUnigrams1", "NumCharUnigrams2",
+        "SentenceBigramUnion", "SentenceBigramIntersection", "NumSentBigrams1", "NumSentBigrams2"
     ])
-    # nist_scores = nist_score(sentence1array, sentence2array)
+    nist_scores = nist_score(sentence1array, sentence2array)
     bleu_scores = bleu_score(sentence1array, sentence2array)
 
     features["BLEU_1"] = bleu_scores["BLEU_1"]
@@ -168,11 +171,11 @@ def all_features(sentence1array, sentence2array):
     features["BLEU_3"] = bleu_scores["BLEU_3"]
     features["BLEU_4"] = bleu_scores["BLEU_4"]
 
-    # features["NIST_1"] = nist_scores["NIST_1"]
-    # features["NIST_2"] = nist_scores["NIST_2"]
-    # features["NIST_3"] = nist_scores["NIST_3"]
-    # features["NIST_4"] = nist_scores["NIST_4"]
-    # features["NIST_5"] = nist_scores["NIST_5"]
+    features["NIST_1"] = nist_scores["NIST_1"]
+    features["NIST_2"] = nist_scores["NIST_2"]
+    features["NIST_3"] = nist_scores["NIST_3"]
+    features["NIST_4"] = nist_scores["NIST_4"]
+    features["NIST_5"] = nist_scores["NIST_5"]
 
     features["Cosine Similarity"] = vectorize_features(sentence1array, sentence2array)
     features["Meteor Score"] = meteor_scores(sentence1array, sentence2array)
@@ -188,6 +191,37 @@ def all_features(sentence1array, sentence2array):
     features["SentenceUnigramIntersection"] = wordUnigramFeatures["SentenceUnigramIntersection"]
     features["NumSentUnigrams1"] = wordUnigramFeatures["NumSentUnigrams1"]
     features["NumSentUnigrams2"] = wordUnigramFeatures["NumSentUnigrams2"]
+
+    char_bigram = character_bigrams_features(sentence1array, sentence2array)
+    char_unigram = character_unigrams_features(sentence1array, sentence2array)
+    word_unigram = word_unigram_features(sentence1array, sentence2array)
+    word_bigram = word_bigram_features(sentence1array, sentence2array)
+
+    # "CharacterBigramUnion", "CharacterBigramIntersection", "NumCharBigrams1", "NumCharBigrams2"
+    features["CharacterBigramUnion"] = char_bigram["CharacterBigramUnion"]
+    features["CharacterBigramIntersection"] = char_bigram["CharacterBigramIntersection"]
+    features["NumCharBigrams1"] = char_bigram["NumCharBigrams1"]
+    features["NumCharBigrams2"] = char_bigram["NumCharBigrams2"]
+
+    # "CharacterUnigramUnion", "CharacterUnigramIntersection",
+    #                                      "NumCharUnigrams1", "NumCharUnigrams2"
+    features["CharacterUnigramUnion"] = char_unigram["CharacterUnigramUnion"]
+    features["CharacterUnigramIntersection"] = char_unigram["CharacterUnigramIntersection"]
+    features["NumCharUnigrams1"] = char_unigram["NumCharUnigrams1"]
+    features["NumCharUnigrams2"] = char_unigram["NumCharUnigrams2"]
+
+    # "SentenceUnigramUnion", "SentenceUnigramIntersection",
+    # "NumSentUnigrams1", "NumSentUnigrams2"
+    features["SentenceUnigramUnion"] = word_unigram["SentenceUnigramUnion"]
+    features["SentenceUnigramIntersection"] = word_unigram["SentenceUnigramIntersection"]
+    features["NumSentUnigrams1"] = word_unigram["NumSentUnigrams1"]
+    features["NumSentUnigrams2"] = word_unigram["NumSentUnigrams2"]
+    # "SentenceBigramUnion", "SentenceBigramIntersection",
+    #                                      "NumSentBigrams1", "NumSentBigrams2"
+    features["SentenceBigramUnion"] = word_bigram["SentenceBigramUnion"]
+    features["SentenceBigramIntersection"] = word_bigram["SentenceBigramIntersection"]
+    features["NumSentBigrams1"] = word_bigram["NumSentBigrams1"]
+    features["NumSentBigrams2"] = word_bigram["NumSentBigrams2"]
 
     return features
 
@@ -439,41 +473,44 @@ def word_and_sentence_features(sentence1array, sentence2array):
     word_unigram = word_unigram_features(sentence1array, sentence2array)
     word_bigram = word_bigram_features(sentence1array, sentence2array)
 
-#"CharacterBigramUnion", "CharacterBigramIntersection", "NumCharBigrams1", "NumCharBigrams2"
+    # "CharacterBigramUnion", "CharacterBigramIntersection", "NumCharBigrams1", "NumCharBigrams2"
     features["CharacterBigramUnion"] = char_bigram["CharacterBigramUnion"]
     features["CharacterBigramIntersection"] = char_bigram["CharacterBigramIntersection"]
     features["NumCharBigrams1"] = char_bigram["NumCharBigrams1"]
     features["NumCharBigrams2"] = char_bigram["NumCharBigrams2"]
 
-# "CharacterUnigramUnion", "CharacterUnigramIntersection",
+    # "CharacterUnigramUnion", "CharacterUnigramIntersection",
     #                                      "NumCharUnigrams1", "NumCharUnigrams2"
     features["CharacterUnigramUnion"] = char_unigram["CharacterUnigramUnion"]
     features["CharacterUnigramIntersection"] = char_unigram["CharacterUnigramIntersection"]
     features["NumCharUnigrams1"] = char_unigram["NumCharUnigrams1"]
     features["NumCharUnigrams2"] = char_unigram["NumCharUnigrams2"]
 
-#"SentenceUnigramUnion", "SentenceUnigramIntersection",
-                                     #"NumSentUnigrams1", "NumSentUnigrams2"
+    # "SentenceUnigramUnion", "SentenceUnigramIntersection",
+    # "NumSentUnigrams1", "NumSentUnigrams2"
     features["SentenceUnigramUnion"] = word_unigram["SentenceUnigramUnion"]
     features["SentenceUnigramIntersection"] = word_unigram["SentenceUnigramIntersection"]
     features["NumSentUnigrams1"] = word_unigram["NumSentUnigrams1"]
     features["NumSentUnigrams2"] = word_unigram["NumSentUnigrams2"]
-# "SentenceBigramUnion", "SentenceBigramIntersection",
+    # "SentenceBigramUnion", "SentenceBigramIntersection",
     #                                      "NumSentBigrams1", "NumSentBigrams2"
     features["SentenceBigramUnion"] = word_bigram["SentenceBigramUnion"]
     features["SentenceBigramIntersection"] = word_bigram["SentenceBigramIntersection"]
     features["NumSentBigrams1"] = word_bigram["NumSentBigrams1"]
     features["NumSentBigrams2"] = word_bigram["NumSentBigrams2"]
 
+    features["Meteor"] = meteor_scores(sentence1array, sentence2array)
+    features["CosineSimilarity"] = vectorize_features(sentence1array, sentence2array)
+
     return features
 
 
 training_data = simplified_preprocessing("train_with_label.txt")
-X = word_and_sentence_features(training_data["Sentence_1"], training_data["Sentence_2"])
+X = all_features(training_data["Sentence_1"], training_data["Sentence_2"])
 y = training_data["Output"]
 
 dev_data = simplified_preprocessing("dev_with_label.txt")
-Xdev = word_and_sentence_features(dev_data["Sentence_1"], dev_data["Sentence_2"])
+Xdev = all_features(dev_data["Sentence_1"], dev_data["Sentence_2"])
 ydev = dev_data["Output"]
 
 # Code to find the optimal Logistic Regression Model
@@ -485,13 +522,45 @@ pipe = sklearn.pipeline.Pipeline(steps=[('std_slc', std_slc),
                                         ('pca', pca),
                                         ('logistic_Reg', logModel)])
 n_components = list(range(1, X.shape[1] + 1, 1))
-penalty = 'none',
+penalty = ['l1', 'l2', 'elasticnet', 'none'],
 solver = ['newton-cg', 'lbfgs', 'liblinear', 'sag', 'saga']
-parameters = dict(pca__n_components=n_components,
-                  logistic_Reg__solver=solver,
-                  logistic_Reg__penalty=penalty)
+valuesToDivide = list(range(1, 20))
+C = [i / 10 for i in valuesToDivide]
+# all_params = list(product(n_components, penalty, solver, C))
+# parameters = [
+#     {'pca__n_components': [n_components],
+#      'logistic_Reg__solver': [solver],
+#      'logistic_Reg__penalty': [penalty],
+#      'logistic_Reg__C': [C]
+#      } for n_components, penalty, solver, C in all_params
+#     if not (penalty == 'l1' and solver in ["sag", "lbfgs", "newton-cg"])
+#     and not (penalty == 'none' and solver in ["liblinear"])
+#     and not (penalty == 'elasticnet' and solver in ["sag", "lbfgs", "newton-cg", "liblinear"])
+# ]
+Grid_params = [
+    {'logistic_Reg__solver': ['saga'],
+     'logistic_Reg__penalty': ['elasticnet', 'l1', 'l2', 'none'],
+     'pca__n_components': n_components,
+     'logistic_Reg__C': C},
+    {'logistic_Reg__solver': ['newton-cg'],
+     'logistic_Reg__penalty': ['l2', 'none'],
+     'pca__n_components': n_components,
+     'logistic_Reg__C': C},
+    {'logistic_Reg__solver': ['lbfgs'],
+     'logistic_Reg__penalty': ['l2', 'none'],
+     'pca__n_components': n_components,
+     'logistic_Reg__C': C},
+    {'logistic_Reg__solver': ['liblinear'],
+     'logistic_Reg__penalty': ['l1', 'l2'],
+     'pca__n_components': n_components,
+     'logistic_Reg__C': C},
+    {'logistic_Reg__solver': ['sag'],
+     'logistic_Reg__penalty': ['l2', 'none'],
+     'pca__n_components': n_components,
+     'logistic_Reg__C': C}
+]
 
-clf_GS = GridSearchCV(pipe, parameters)
+clf_GS = GridSearchCV(pipe, Grid_params, verbose=2)
 clf_GS.fit(X, y)
 
 print('Best Penalty:', clf_GS.best_estimator_.get_params()['logistic_Reg__penalty'])
@@ -499,6 +568,12 @@ print('Best C:', clf_GS.best_estimator_.get_params()['logistic_Reg__C'])
 print('Best Number Of Components:', clf_GS.best_estimator_.get_params()['pca__n_components'])
 print(clf_GS.best_estimator_.get_params()['logistic_Reg'])
 print("Optimized logistic regression model accuracy:" + str(clf_GS.score(Xdev, ydev)))
+
+# Best Penalty: none
+# Best C: 0.1
+# Best Number Of Components: 8
+# LogisticRegression(C=0.1, penalty='none', solver='newton-cg')
+# Optimized logistic regression model accuracy:0.6443381180223285
 
 # Code to find the optimal Support Vector Classifier Model
 # pipeSVC = sklearn.pipeline.Pipeline(steps=[('std_slc', StandardScaler()),
@@ -531,6 +606,6 @@ print("Optimized logistic regression model accuracy:" + str(clf_GS.score(Xdev, y
 # Linear SVC Accuracy: 0.6586921850079744
 
 #
-# linearSVC = make_pipeline(StandardScaler(), decomposition.PCA(n_components=12), SVC(kernel="linear", C=1.5))
+# linearSVC = make_pipeline(StandardScaler(), SVC(kernel="linear", C=1.5))
 # linearSVC.fit(X, y)
 # print("Linear SVC Accuracy: " + str(linearSVC.score(Xdev, ydev)))
