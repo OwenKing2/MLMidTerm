@@ -149,14 +149,18 @@ def meteor_scores(sentence1array, sentence2array):
 # Currently my highest accuracy (with NIST features removed acc ~67%
 def all_features(sentence1array, sentence2array):
     features = pd.DataFrame(columns=[
-        # "NIST_1", "NIST_2", "NIST_3", "NIST_4", "NIST_5",
+        # "NIST_1",
+        # "NIST_2",
+        # "NIST_3",
+        # "NIST_4",
+        # "NIST_5",
         "BLEU_1", "BLEU_2", "BLEU_3", "BLEU_4",
         "Cosine Similarity",
         "Meteor Score",
-        "Character Bigram Union", "Character Bigram Intersection", "NumBigrams1", "NumBigrams2",
-        "Sentence Unigram Union", "Sentence Unigram Intersection", "NumUnigrams1", "NumUnigrams2"
+        "CharacterBigramUnion", "CharacterBigramIntersection", "NumCharBigrams1", "NumCharBigrams2",
+        "SentenceUnigramUnion", "SentenceUnigramIntersection", "NumSentUnigrams1", "NumSentUnigrams2"
     ])
-    nist_scores = nist_score(sentence1array, sentence2array)
+    # nist_scores = nist_score(sentence1array, sentence2array)
     bleu_scores = bleu_score(sentence1array, sentence2array)
 
     features["BLEU_1"] = bleu_scores["BLEU_1"]
@@ -174,16 +178,16 @@ def all_features(sentence1array, sentence2array):
     features["Meteor Score"] = meteor_scores(sentence1array, sentence2array)
 
     charBigramFeatures = character_bigrams_features(sentence1array, sentence2array)
-    features["Character Bigram Union"] = charBigramFeatures["Character Bigram Union"]
-    features["Character Bigram Intersection"] = charBigramFeatures["Character Bigram Intersection"]
-    features["NumBigrams1"] = charBigramFeatures["NumBigrams1"]
-    features["NumBigrams2"] = charBigramFeatures["NumBigrams2"]
+    features["CharacterBigramUnion"] = charBigramFeatures["CharacterBigramUnion"]
+    features["CharacterBigramIntersection"] = charBigramFeatures["CharacterBigramIntersection"]
+    features["NumCharBigrams1"] = charBigramFeatures["NumCharBigrams1"]
+    features["NumCharBigrams2"] = charBigramFeatures["NumCharBigrams2"]
 
     wordUnigramFeatures = word_unigram_features(sentence1array, sentence2array)
-    features["Sentence Unigram Union"] = wordUnigramFeatures["Sentence Unigram Union"]
-    features["Sentence Unigram Intersection"] = wordUnigramFeatures["Sentence Unigram Intersection"]
-    features["NumUnigrams1"] = wordUnigramFeatures["NumUnigrams1"]
-    features["NumUnigrams2"] = wordUnigramFeatures["NumUnigrams2"]
+    features["SentenceUnigramUnion"] = wordUnigramFeatures["SentenceUnigramUnion"]
+    features["SentenceUnigramIntersection"] = wordUnigramFeatures["SentenceUnigramIntersection"]
+    features["NumSentUnigrams1"] = wordUnigramFeatures["NumSentUnigrams1"]
+    features["NumSentUnigrams2"] = wordUnigramFeatures["NumSentUnigrams2"]
 
     return features
 
@@ -283,21 +287,13 @@ def feature_extractor(sentence1array, sentence2array):
 
 
 def vectorize_features(sentence1array, sentence2array):
-    # features = pd.DataFrame(columns=["Word Union", "Word Intersection", "Word 1 Length", "Word 2 Length",
-    #                                 "Bigram Union", "Bigram Intersection", "Bigram 1 Length", "Bigram 2 Length"])
-
     features = pd.DataFrame(columns=["Sentence Cosine Similarity"])
-    # sentence1list = []
-    # sentence2list = []
     sentence1vectors = []
     sentence2vectors = []
     embeddings = spacy.load('en_core_web_sm')
-
     for sentence in sentence1array:
-        # sentence1list.append(sentence)
         sentence1vectors.append(embeddings(sentence).vector)
     for sentence in sentence2array:
-        # sentence2list.append(sentence)
         sentence2vectors.append(embeddings(sentence).vector)
     cosinesim = []
     for (vector_1, vector_2) in itertools.zip_longest(sentence1vectors, sentence2vectors):
@@ -308,32 +304,16 @@ def vectorize_features(sentence1array, sentence2array):
 
 
 def meteor_and_vector(sentence1array, sentence2array):
-    features = pd.DataFrame(columns=["Sentence Cosine Similarity", "Meteor Score", "Length Comparison", "Union",
-                                     "Proportion of Matching Words"])
+    features = pd.DataFrame(columns=["Sentence Cosine Similarity", "Meteor Score"])
     features["Meteor Score"] = meteor_scores(sentence1array, sentence2array)
     features["Sentence Cosine Similarity"] = vectorize_features(sentence1array, sentence2array)
-    length = []
-    for (sentence_1, sentence_2) in itertools.zip_longest(sentence1array, sentence2array):
-        length.append(abs(len(sentence_1) - len(sentence_2)) / ((len(sentence_1) + len(sentence_2)) / 2))
-    features['Length Comparison'] = length
-    matching = []
-    union = []
-    for (sentence_1, sentence_2) in itertools.zip_longest(sentence1array, sentence2array):
-        combined_sentence = sentence_1 + sentence_2
-        unique_words = len(set(combined_sentence.split(' ')))
-        sentence_1_words = sentence_1.split(" ")
-        sentence_2_words = sentence_2.split(" ")
-        common_words = len(list(set(sentence_1_words) & set(sentence_2_words)))
-        matching.append(common_words)
-        union.append(unique_words)
-    features['Proportion of Matching Words'] = matching
-    features['Union'] = union
     return features
 
 
 def character_bigrams_features(sentence1array, sentence2array):
-    features = pd.DataFrame(columns=["Character Bigram Union", "Character Bigram Intersection",
-                                     "NumBigrams1", "NumBigrams2"])
+    features = pd.DataFrame(columns=["CharacterBigramUnion", "CharacterBigramIntersection",
+                                     "NumCharBigrams1", "NumCharBigrams2",
+                                     ])
     bigramUnion = []
     bigramIntersection = []
     numbigrams1 = []
@@ -352,17 +332,46 @@ def character_bigrams_features(sentence1array, sentence2array):
         bigramUnion.append(len(sentence_1_char_bigrams) + len(sentence_2_char_bigrams))
         numbigrams1.append(len(sentence_1_char_bigrams))
         numbigrams2.append(len(sentence_2_char_bigrams))
-    features["Character Bigram Union"] = bigramUnion
-    features["Character Bigram Intersection"] = bigramIntersection
-    features["NumBigrams1"] = numbigrams1
-    features["NumBigrams2"] = numbigrams2
+    features["CharacterBigramUnion"] = bigramUnion
+    features["CharacterBigramIntersection"] = bigramIntersection
+    features["NumCharBigrams1"] = numbigrams1
+    features["NumCharBigrams2"] = numbigrams2
+
+    return features
+
+
+def character_unigrams_features(sentence1array, sentence2array):
+    features = pd.DataFrame(columns=["CharacterUnigramUnion", "CharacterUnigramIntersection",
+                                     "NumCharUnigrams1", "NumCharUnigrams2"])
+    CharacterUnigramUnion = []
+    CharacterUnigramIntersection = []
+    NumUnigrams1 = []
+    NumUnigrams2 = []
+
+    for (sentence_1, sentence_2) in itertools.zip_longest(sentence1array, sentence2array):
+        sentence_1_no_spaces = sentence_1.replace(" ", "")
+        sentence_2_no_spaces = sentence_2.replace(" ", "")
+        sentence_1_char_unigrams = list(sentence_1_no_spaces)
+        sentence_2_char_unigrams = list(sentence_2_no_spaces)
+        unigram_matches = 0
+        for char in sentence_1_char_unigrams:
+            if char in sentence_2_char_unigrams:
+                unigram_matches += 1
+        CharacterUnigramIntersection.append(unigram_matches)
+        CharacterUnigramUnion.append(len(sentence_1_char_unigrams) + len(sentence_2_char_unigrams))
+        NumUnigrams1.append(len(sentence_1_char_unigrams))
+        NumUnigrams2.append(len(sentence_2_char_unigrams))
+    features["CharacterUnigramUnion"] = CharacterUnigramUnion
+    features["CharacterUnigramIntersection"] = CharacterUnigramIntersection
+    features["NumCharUnigrams1"] = NumUnigrams1
+    features["NumCharUnigrams2"] = NumUnigrams2
 
     return features
 
 
 def word_unigram_features(sentence1array, sentence2array):
-    features = pd.DataFrame(columns=["Sentence Unigram Union", "Sentence Unigram Intersection",
-                                     "NumUnigrams1", "NumUnigrams2"])
+    features = pd.DataFrame(columns=["SentenceUnigramUnion", "SentenceUnigramIntersection",
+                                     "NumSentUnigrams1", "NumSentUnigrams2"])
     unigramUnion = []
     unigramIntersection = []
     numunigrams1 = []
@@ -381,44 +390,90 @@ def word_unigram_features(sentence1array, sentence2array):
         unigramUnion.append(len(sentence_1_unigrams) + len(sentence_2_unigrams))
         numunigrams1.append(len(sentence_1_unigrams))
         numunigrams2.append(len(sentence_2_unigrams))
-    features["Sentence Unigram Union"] = unigramUnion
-    features["Sentence Unigram Intersection"] = unigramIntersection
-    features["NumUnigrams1"] = numunigrams1
-    features["NumUnigrams2"] = numunigrams2
+    features["SentenceUnigramUnion"] = unigramUnion
+    features["SentenceUnigramIntersection"] = unigramIntersection
+    features["NumSentUnigrams1"] = numunigrams1
+    features["NumSentUnigrams2"] = numunigrams2
     return features
 
 
-def charBigramWordUnigram(sentence1array, sentence2array):
-    features = pd.DataFrame(columns=[
-        # "Sentence Unigram Union", "Sentence Unigram Intersection", "NumUnigrams1", "NumUnigrams2",
-        # "Character Bigram Union", "Character Bigram Intersection", "NumBigrams1", "NumBigrams2",
-        "Meteor Score",
-        "Cosine Similarity"
-    ])
-    charBigramFeatures = character_bigrams_features(sentence1array, sentence2array)
-    # wordUnigramFeatures = word_unigram_features(sentence1array,sentence2array)
+def word_bigram_features(sentence1array, sentence2array):
+    features = pd.DataFrame(columns=["SentenceBigramUnion", "SentenceBigramIntersection",
+                                     "NumSentBigrams1", "NumSentBigrams2"])
+    SentencebigramUnion = []
+    SentencebigramIntersection = []
+    Numbigrams1 = []
+    Numbigrams2 = []
 
-    # features["Character Bigram Union"] = charBigramFeatures["Character Bigram Union"]
-    # features["Character Bigram Intersection"] = charBigramFeatures["Character Bigram Intersection"]
-    # features["NumBigrams1"] = charBigramFeatures["NumBigrams1"]
-    # features["NumBigrams2"] = charBigramFeatures["NumBigrams2"]
+    for (sentence_1, sentence_2) in itertools.zip_longest(sentence1array, sentence2array):
+        sentence_1_words = nltk.word_tokenize(sentence_1)
+        sentence_2_words = nltk.word_tokenize(sentence_2)
+        sentence_1_bigrams = list(nltk.ngrams(sentence_1_words, 2))
+        sentence_2_bigrams = list(nltk.ngrams(sentence_2_words, 2))
+        bigram_matches = 0
+        for phrase in sentence_1_bigrams:
+            if phrase in sentence_2_bigrams:
+                bigram_matches += 1
+        SentencebigramIntersection.append(bigram_matches)
+        SentencebigramUnion.append(len(sentence_1_bigrams) + len(sentence_2_bigrams))
+        Numbigrams1.append(len(sentence_1_bigrams))
+        Numbigrams2.append(len(sentence_2_bigrams))
+    features["SentenceBigramUnion"] = SentencebigramUnion
+    features["SentenceBigramIntersection"] = SentencebigramIntersection
+    features["NumSentBigrams1"] = Numbigrams1
+    features["NumSentBigrams2"] = Numbigrams2
+    return features
 
-    # features["Sentence Unigram Union"] = wordUnigramFeatures["Sentence Unigram Union"]
-    # features["Sentence Unigram Intersection"] = wordUnigramFeatures["Sentence Unigram Intersection"]
-    # features["NumUnigrams1"] = wordUnigramFeatures["NumUnigrams1"]
-    # features["NumUnigrams2"] = wordUnigramFeatures["NumUnigrams2"]
-    features["Meteor Score"] = meteor_scores(sentence1array, sentence2array)
-    features["Cosine Similarity"] = vectorize_features(sentence1array, sentence2array)
+
+def word_and_sentence_features(sentence1array, sentence2array):
+    features = pd.DataFrame(
+        # columns=[
+        #     "CharacterBigramUnion", "CharacterBigramIntersection", "NumCharBigrams1", "NumCharBigrams2",
+        #     "CharacterUnigramUnion", "CharacterUnigramIntersection", "NumCharUnigrams1", "NumCharUnigrams2",
+        #     "SentenceUnigramUnion", "SentenceUnigramIntersection", "NumSentUnigrams1", "NumSentUnigrams2",
+        #     "SentenceBigramUnion", "SentenceBigramIntersection", "NumSentBigrams1", "NumSentBigrams2"
+        # ]
+    )
+    char_bigram = character_bigrams_features(sentence1array, sentence2array)
+    char_unigram = character_unigrams_features(sentence1array, sentence2array)
+    word_unigram = word_unigram_features(sentence1array, sentence2array)
+    word_bigram = word_bigram_features(sentence1array, sentence2array)
+
+#"CharacterBigramUnion", "CharacterBigramIntersection", "NumCharBigrams1", "NumCharBigrams2"
+    features["CharacterBigramUnion"] = char_bigram["CharacterBigramUnion"]
+    features["CharacterBigramIntersection"] = char_bigram["CharacterBigramIntersection"]
+    features["NumCharBigrams1"] = char_bigram["NumCharBigrams1"]
+    features["NumCharBigrams2"] = char_bigram["NumCharBigrams2"]
+
+# "CharacterUnigramUnion", "CharacterUnigramIntersection",
+    #                                      "NumCharUnigrams1", "NumCharUnigrams2"
+    features["CharacterUnigramUnion"] = char_unigram["CharacterUnigramUnion"]
+    features["CharacterUnigramIntersection"] = char_unigram["CharacterUnigramIntersection"]
+    features["NumCharUnigrams1"] = char_unigram["NumCharUnigrams1"]
+    features["NumCharUnigrams2"] = char_unigram["NumCharUnigrams2"]
+
+#"SentenceUnigramUnion", "SentenceUnigramIntersection",
+                                     #"NumSentUnigrams1", "NumSentUnigrams2"
+    features["SentenceUnigramUnion"] = word_unigram["SentenceUnigramUnion"]
+    features["SentenceUnigramIntersection"] = word_unigram["SentenceUnigramIntersection"]
+    features["NumSentUnigrams1"] = word_unigram["NumSentUnigrams1"]
+    features["NumSentUnigrams2"] = word_unigram["NumSentUnigrams2"]
+# "SentenceBigramUnion", "SentenceBigramIntersection",
+    #                                      "NumSentBigrams1", "NumSentBigrams2"
+    features["SentenceBigramUnion"] = word_bigram["SentenceBigramUnion"]
+    features["SentenceBigramIntersection"] = word_bigram["SentenceBigramIntersection"]
+    features["NumSentBigrams1"] = word_bigram["NumSentBigrams1"]
+    features["NumSentBigrams2"] = word_bigram["NumSentBigrams2"]
 
     return features
 
 
 training_data = simplified_preprocessing("train_with_label.txt")
-X = all_features(training_data["Sentence_1"], training_data["Sentence_2"])
+X = word_and_sentence_features(training_data["Sentence_1"], training_data["Sentence_2"])
 y = training_data["Output"]
 
 dev_data = simplified_preprocessing("dev_with_label.txt")
-Xdev = all_features(dev_data["Sentence_1"], dev_data["Sentence_2"])
+Xdev = word_and_sentence_features(dev_data["Sentence_1"], dev_data["Sentence_2"])
 ydev = dev_data["Output"]
 
 # Code to find the optimal Logistic Regression Model
@@ -450,31 +505,32 @@ print("Optimized logistic regression model accuracy:" + str(clf_GS.score(Xdev, y
 #                                            ('pca', decomposition.PCA()),
 #                                            ('svc', SVC())])
 #
-# kernel = ['linear', 'rbf', 'sigmoid']
-# C = [0.0001, 0.001, 0.01, 0.1, 1, 2]
-# # gamma = np.logspace(-9, 9, num=25, base=10)
-# gamma = ['scale', 'auto']
+# kernel = ['linear']
+# C = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2]
+# # gamma = ['scale', 'auto']
 # parametersSVC = dict(pca__n_components=n_components,
 #                      svc__kernel=kernel,
 #                      svc__C=C,
-#                      svc__gamma=gamma)
+#                      # svc__gamma=gamma
+#                      )
 #
 # clf_SVC = GridSearchCV(pipeSVC, parametersSVC, verbose=3)
 # clf_SVC.fit(X, y)
 # print('Best kernel:', clf_SVC.best_estimator_.get_params()['svc__kernel'])
 # print('Best C:', clf_SVC.best_estimator_.get_params()['svc__C'])
-# print('Best gamma:', clf_SVC.best_estimator_.get_params()['svc__gamma'])
+# # print('Best gamma:', clf_SVC.best_estimator_.get_params()['svc__gamma'])
 # print('Best Number Of Components:', clf_SVC.best_estimator_.get_params()['pca__n_components'])
 # print(clf_SVC.best_estimator_.get_params()['svc'])
 # print("Best SVC model accuracy: " + str(clf_SVC.score(Xdev, ydev)))
 # SVC optimal model finder is missing linear model found naturally for some reason, but
-# listed best model parameters after running are:
-# kernel: rbg
-# C: 2
-# gamma: auto
-# Components: 12
+# Best kernel: linear
+# Best C: 0.5623413251903491
+# Best Number Of Components: 11
+# SVC(C=0.5623413251903491, kernel='linear')
+# Best SVC model accuracy: 0.6555023923444976
+# Linear SVC Accuracy: 0.6586921850079744
 
 #
-linearSVC = make_pipeline(StandardScaler(), decomposition.PCA(), SVC(kernel="linear"))
-linearSVC.fit(X, y)
-print("Linear SVC Accuracy: " + str(linearSVC.score(Xdev, ydev)))
+# linearSVC = make_pipeline(StandardScaler(), decomposition.PCA(n_components=12), SVC(kernel="linear", C=1.5))
+# linearSVC.fit(X, y)
+# print("Linear SVC Accuracy: " + str(linearSVC.score(Xdev, ydev)))
