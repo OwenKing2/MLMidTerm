@@ -16,6 +16,8 @@ import spacy
 from sklearn import linear_model, decomposition
 import en_core_web_sm
 from sklearn.model_selection import GridSearchCV
+from sklearn.experimental import enable_halving_search_cv
+from sklearn.model_selection import HalvingGridSearchCV
 
 import warnings
 
@@ -144,10 +146,10 @@ def meteor_scores(sentence1array, sentence2array):
     return features
 
 
-# Currently my highest accuracy (with NIST features removed acc ~64%
+# Currently my highest accuracy (with NIST features removed acc ~67%
 def all_features(sentence1array, sentence2array):
     features = pd.DataFrame(columns=[
-    #    "NIST_1", "NIST_2", "NIST_3", "NIST_4", "NIST_5",
+        # "NIST_1", "NIST_2", "NIST_3", "NIST_4", "NIST_5",
         "BLEU_1", "BLEU_2", "BLEU_3", "BLEU_4",
         "Cosine Similarity",
         "Meteor Score",
@@ -393,7 +395,7 @@ def charBigramWordUnigram(sentence1array, sentence2array):
         "Meteor Score",
         "Cosine Similarity"
     ])
-    charBigramFeatures = character_bigrams_features(sentence1array,sentence2array)
+    charBigramFeatures = character_bigrams_features(sentence1array, sentence2array)
     # wordUnigramFeatures = word_unigram_features(sentence1array,sentence2array)
 
     # features["Character Bigram Union"] = charBigramFeatures["Character Bigram Union"]
@@ -443,8 +445,36 @@ print('Best Number Of Components:', clf_GS.best_estimator_.get_params()['pca__n_
 print(clf_GS.best_estimator_.get_params()['logistic_Reg'])
 print("Optimized logistic regression model accuracy:" + str(clf_GS.score(Xdev, ydev)))
 
-nonelogisticRegression = make_pipeline(StandardScaler(),
-                                       LogisticRegression(penalty="none", solver="newton-cg"))
-nonelogisticRegression.fit(X, y)
+# Code to find the optimal Support Vector Classifier Model
+# pipeSVC = sklearn.pipeline.Pipeline(steps=[('std_slc', StandardScaler()),
+#                                            ('pca', decomposition.PCA()),
+#                                            ('svc', SVC())])
+#
+# kernel = ['linear', 'rbf', 'sigmoid']
+# C = [0.0001, 0.001, 0.01, 0.1, 1, 2]
+# # gamma = np.logspace(-9, 9, num=25, base=10)
+# gamma = ['scale', 'auto']
+# parametersSVC = dict(pca__n_components=n_components,
+#                      svc__kernel=kernel,
+#                      svc__C=C,
+#                      svc__gamma=gamma)
+#
+# clf_SVC = GridSearchCV(pipeSVC, parametersSVC, verbose=3)
+# clf_SVC.fit(X, y)
+# print('Best kernel:', clf_SVC.best_estimator_.get_params()['svc__kernel'])
+# print('Best C:', clf_SVC.best_estimator_.get_params()['svc__C'])
+# print('Best gamma:', clf_SVC.best_estimator_.get_params()['svc__gamma'])
+# print('Best Number Of Components:', clf_SVC.best_estimator_.get_params()['pca__n_components'])
+# print(clf_SVC.best_estimator_.get_params()['svc'])
+# print("Best SVC model accuracy: " + str(clf_SVC.score(Xdev, ydev)))
+# SVC optimal model finder is missing linear model found naturally for some reason, but
+# listed best model parameters after running are:
+# kernel: rbg
+# C: 2
+# gamma: auto
+# Components: 12
 
-print("None Logistic Regression Model Accuracy:" + str(nonelogisticRegression.score(Xdev, ydev)))
+#
+linearSVC = make_pipeline(StandardScaler(), decomposition.PCA(), SVC(kernel="linear"))
+linearSVC.fit(X, y)
+print("Linear SVC Accuracy: " + str(linearSVC.score(Xdev, ydev)))
