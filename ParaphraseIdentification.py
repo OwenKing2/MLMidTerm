@@ -66,23 +66,6 @@ def meteor_scores(sentence1array, sentence2array):
     return features
 
 
-def vectorize_features(sentence1array, sentence2array):
-    features = pd.DataFrame(columns=["Sentence Cosine Similarity"])
-    sentence1vectors = []
-    sentence2vectors = []
-    embeddings = spacy.load('en_core_web_sm')
-    for sentence in sentence1array:
-        sentence1vectors.append(embeddings(sentence).vector)
-    for sentence in sentence2array:
-        sentence2vectors.append(embeddings(sentence).vector)
-    cosinesim = []
-    for (vector_1, vector_2) in itertools.zip_longest(sentence1vectors, sentence2vectors):
-        cosinesim.append(cosine_similarity([vector_1], [vector_2]))
-    features["Sentence Cosine Similarity"] = cosinesim
-
-    return features
-
-
 def character_bigrams_features(sentence1array, sentence2array):
     features = pd.DataFrame(columns=["CharacterBigramUnion", "CharacterBigramIntersection",
                                      "NumCharBigrams1", "NumCharBigrams2",
@@ -144,7 +127,6 @@ def word_unigram_features(sentence1array, sentence2array):
 def all_features(sentence1array, sentence2array):
     features = pd.DataFrame(columns=[
         "BLEU_1", "BLEU_2", "BLEU_3", "BLEU_4",
-        "Cosine Similarity",
         "Meteor Score",
         "CharacterBigramUnion", "CharacterBigramIntersection", "NumCharBigrams1", "NumCharBigrams2",
         "SentenceUnigramUnion", "SentenceUnigramIntersection", "NumSentUnigrams1", "NumSentUnigrams2",
@@ -156,7 +138,6 @@ def all_features(sentence1array, sentence2array):
     features["BLEU_3"] = bleu_scores["BLEU_3"]
     features["BLEU_4"] = bleu_scores["BLEU_4"]
 
-    features["Cosine Similarity"] = vectorize_features(sentence1array, sentence2array)
     features["Meteor Score"] = meteor_scores(sentence1array, sentence2array)
 
     char_bigram = character_bigrams_features(sentence1array, sentence2array)
