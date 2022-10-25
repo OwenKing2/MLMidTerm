@@ -1,3 +1,4 @@
+import csv
 import itertools
 import string
 
@@ -9,7 +10,7 @@ from nltk.corpus import stopwords
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import make_pipeline, Pipeline
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.svm import SVC
 from sklearn.metrics.pairwise import cosine_similarity
 import spacy
@@ -37,7 +38,7 @@ def datapreprocess(filename):
     #     nltk.download('punkt')
 
     header = ["train_id", "Sentence_1", "Sentence_2", "Output"]
-    df = pd.read_csv(filename, sep='\t', on_bad_lines='skip', names=header, engine='python')
+    df = pd.read_csv(filename, sep='\t', error_bad_lines=False, names=header, engine='python', quoting=csv.QUOTE_NONE)
     stop_words = set(stopwords.words('english'))
     # Remove stop words like and, a, the
     df['Sentence_1'] = df['Sentence_1'].apply(
@@ -70,7 +71,8 @@ def datapreprocess(filename):
 
 def simplified_preprocessing(filename):
     header = ["train_id", "Sentence_1", "Sentence_2", "Output"]
-    df = pd.read_csv(filename, sep='\t', on_bad_lines='skip', names=header, engine='python')
+    df = pd.read_csv(filename, sep='\t', names=header, engine='python', encoding='utf8', error_bad_lines=False,
+                     quoting=csv.QUOTE_NONE)
     # Make all words lowercase
     df['Sentence_1'] = df['Sentence_1'].str.lower()
     df['Sentence_2'] = df['Sentence_2'].str.lower()
@@ -150,20 +152,20 @@ def meteor_scores(sentence1array, sentence2array):
 # Currently my highest accuracy (with NIST features removed acc ~67%
 def all_features(sentence1array, sentence2array):
     features = pd.DataFrame(columns=[
-        "NIST_1",
-        "NIST_2",
-        "NIST_3",
-        "NIST_4",
-        "NIST_5",
+        # "NIST_1",
+        # "NIST_2",
+        # "NIST_3",
+        # "NIST_4",
+        # "NIST_5",
         "BLEU_1", "BLEU_2", "BLEU_3", "BLEU_4",
         "Cosine Similarity",
         "Meteor Score",
         "CharacterBigramUnion", "CharacterBigramIntersection", "NumCharBigrams1", "NumCharBigrams2",
         "SentenceUnigramUnion", "SentenceUnigramIntersection", "NumSentUnigrams1", "NumSentUnigrams2",
-        "CharacterUnigramUnion", "CharacterUnigramIntersection", "NumCharUnigrams1", "NumCharUnigrams2",
-        "SentenceBigramUnion", "SentenceBigramIntersection", "NumSentBigrams1", "NumSentBigrams2"
+        # "CharacterUnigramUnion", "CharacterUnigramIntersection", "NumCharUnigrams1", "NumCharUnigrams2",
+        # "SentenceBigramUnion", "SentenceBigramIntersection", "NumSentBigrams1", "NumSentBigrams2"
     ])
-    nist_scores = nist_score(sentence1array, sentence2array)
+    # nist_scores = nist_score(sentence1array, sentence2array)
     bleu_scores = bleu_score(sentence1array, sentence2array)
 
     features["BLEU_1"] = bleu_scores["BLEU_1"]
@@ -171,57 +173,39 @@ def all_features(sentence1array, sentence2array):
     features["BLEU_3"] = bleu_scores["BLEU_3"]
     features["BLEU_4"] = bleu_scores["BLEU_4"]
 
-    features["NIST_1"] = nist_scores["NIST_1"]
-    features["NIST_2"] = nist_scores["NIST_2"]
-    features["NIST_3"] = nist_scores["NIST_3"]
-    features["NIST_4"] = nist_scores["NIST_4"]
-    features["NIST_5"] = nist_scores["NIST_5"]
+    # features["NIST_1"] = nist_scores["NIST_1"]
+    # features["NIST_2"] = nist_scores["NIST_2"]
+    # features["NIST_3"] = nist_scores["NIST_3"]
+    # features["NIST_4"] = nist_scores["NIST_4"]
+    # features["NIST_5"] = nist_scores["NIST_5"]
 
     features["Cosine Similarity"] = vectorize_features(sentence1array, sentence2array)
     features["Meteor Score"] = meteor_scores(sentence1array, sentence2array)
 
-    charBigramFeatures = character_bigrams_features(sentence1array, sentence2array)
-    features["CharacterBigramUnion"] = charBigramFeatures["CharacterBigramUnion"]
-    features["CharacterBigramIntersection"] = charBigramFeatures["CharacterBigramIntersection"]
-    features["NumCharBigrams1"] = charBigramFeatures["NumCharBigrams1"]
-    features["NumCharBigrams2"] = charBigramFeatures["NumCharBigrams2"]
-
-    wordUnigramFeatures = word_unigram_features(sentence1array, sentence2array)
-    features["SentenceUnigramUnion"] = wordUnigramFeatures["SentenceUnigramUnion"]
-    features["SentenceUnigramIntersection"] = wordUnigramFeatures["SentenceUnigramIntersection"]
-    features["NumSentUnigrams1"] = wordUnigramFeatures["NumSentUnigrams1"]
-    features["NumSentUnigrams2"] = wordUnigramFeatures["NumSentUnigrams2"]
-
     char_bigram = character_bigrams_features(sentence1array, sentence2array)
-    char_unigram = character_unigrams_features(sentence1array, sentence2array)
+    # char_unigram = character_unigrams_features(sentence1array, sentence2array)
     word_unigram = word_unigram_features(sentence1array, sentence2array)
     word_bigram = word_bigram_features(sentence1array, sentence2array)
 
-    # "CharacterBigramUnion", "CharacterBigramIntersection", "NumCharBigrams1", "NumCharBigrams2"
     features["CharacterBigramUnion"] = char_bigram["CharacterBigramUnion"]
     features["CharacterBigramIntersection"] = char_bigram["CharacterBigramIntersection"]
     features["NumCharBigrams1"] = char_bigram["NumCharBigrams1"]
     features["NumCharBigrams2"] = char_bigram["NumCharBigrams2"]
 
-    # "CharacterUnigramUnion", "CharacterUnigramIntersection",
-    #                                      "NumCharUnigrams1", "NumCharUnigrams2"
-    features["CharacterUnigramUnion"] = char_unigram["CharacterUnigramUnion"]
-    features["CharacterUnigramIntersection"] = char_unigram["CharacterUnigramIntersection"]
-    features["NumCharUnigrams1"] = char_unigram["NumCharUnigrams1"]
-    features["NumCharUnigrams2"] = char_unigram["NumCharUnigrams2"]
+    # features["CharacterUnigramUnion"] = char_unigram["CharacterUnigramUnion"]
+    # features["CharacterUnigramIntersection"] = char_unigram["CharacterUnigramIntersection"]
+    # features["NumCharUnigrams1"] = char_unigram["NumCharUnigrams1"]
+    # features["NumCharUnigrams2"] = char_unigram["NumCharUnigrams2"]
 
-    # "SentenceUnigramUnion", "SentenceUnigramIntersection",
-    # "NumSentUnigrams1", "NumSentUnigrams2"
     features["SentenceUnigramUnion"] = word_unigram["SentenceUnigramUnion"]
     features["SentenceUnigramIntersection"] = word_unigram["SentenceUnigramIntersection"]
     features["NumSentUnigrams1"] = word_unigram["NumSentUnigrams1"]
     features["NumSentUnigrams2"] = word_unigram["NumSentUnigrams2"]
-    # "SentenceBigramUnion", "SentenceBigramIntersection",
-    #                                      "NumSentBigrams1", "NumSentBigrams2"
-    features["SentenceBigramUnion"] = word_bigram["SentenceBigramUnion"]
-    features["SentenceBigramIntersection"] = word_bigram["SentenceBigramIntersection"]
-    features["NumSentBigrams1"] = word_bigram["NumSentBigrams1"]
-    features["NumSentBigrams2"] = word_bigram["NumSentBigrams2"]
+
+    # features["SentenceBigramUnion"] = word_bigram["SentenceBigramUnion"]
+    # features["SentenceBigramIntersection"] = word_bigram["SentenceBigramIntersection"]
+    # features["NumSentBigrams1"] = word_bigram["NumSentBigrams1"]
+    # features["NumSentBigrams2"] = word_bigram["NumSentBigrams2"]
 
     return features
 
@@ -516,51 +500,46 @@ ydev = dev_data["Output"]
 # Code to find the optimal Logistic Regression Model
 
 std_slc = StandardScaler()
+min_max = MinMaxScaler()
 pca = decomposition.PCA()
 logModel = LogisticRegression()
-pipe = sklearn.pipeline.Pipeline(steps=[('std_slc', std_slc),
+pipe = sklearn.pipeline.Pipeline(steps=[('min_max', min_max),
                                         ('pca', pca),
                                         ('logistic_Reg', logModel)])
 n_components = list(range(1, X.shape[1] + 1, 1))
 penalty = ['l1', 'l2', 'elasticnet', 'none'],
 solver = ['newton-cg', 'lbfgs', 'liblinear', 'sag', 'saga']
-valuesToDivide = list(range(1, 20))
-C = [i / 10 for i in valuesToDivide]
-# all_params = list(product(n_components, penalty, solver, C))
-# parameters = [
-#     {'pca__n_components': [n_components],
-#      'logistic_Reg__solver': [solver],
-#      'logistic_Reg__penalty': [penalty],
-#      'logistic_Reg__C': [C]
-#      } for n_components, penalty, solver, C in all_params
-#     if not (penalty == 'l1' and solver in ["sag", "lbfgs", "newton-cg"])
-#     and not (penalty == 'none' and solver in ["liblinear"])
-#     and not (penalty == 'elasticnet' and solver in ["sag", "lbfgs", "newton-cg", "liblinear"])
+# valuesToDivide = list(range(1, 20))
+# C = [i / 1000 for i in valuesToDivide]
+C = [0.0001, 0.001, 0.01, 0.1, 1, 1.5, 2, 2.5]
+# Grid_params = [
+#     {'logistic_Reg__solver': ['saga'],
+#      'logistic_Reg__penalty': ['elasticnet', 'l1', 'l2', 'none'],
+#      'pca__n_components': n_components,
+#      'logistic_Reg__C': C},
+#     {'logistic_Reg__solver': ['newton-cg'],
+#      'logistic_Reg__penalty': ['l2', 'none'],
+#      'pca__n_components': n_components,
+#      'logistic_Reg__C': C},
+#     {'logistic_Reg__solver': ['lbfgs'],
+#      'logistic_Reg__penalty': ['l2', 'none'],
+#      'pca__n_components': n_components,
+#      'logistic_Reg__C': C},
+#     {'logistic_Reg__solver': ['liblinear'],
+#      'logistic_Reg__penalty': ['l1', 'l2'],
+#      'pca__n_components': n_components,
+#      'logistic_Reg__C': C},
+#     {'logistic_Reg__solver': ['sag'],
+#      'logistic_Reg__penalty': ['l2', 'none'],
+#      'pca__n_components': n_components,
+#      'logistic_Reg__C': C}
 # ]
-Grid_params = [
-    {'logistic_Reg__solver': ['saga'],
-     'logistic_Reg__penalty': ['elasticnet', 'l1', 'l2', 'none'],
-     'pca__n_components': n_components,
-     'logistic_Reg__C': C},
-    {'logistic_Reg__solver': ['newton-cg'],
-     'logistic_Reg__penalty': ['l2', 'none'],
-     'pca__n_components': n_components,
-     'logistic_Reg__C': C},
-    {'logistic_Reg__solver': ['lbfgs'],
-     'logistic_Reg__penalty': ['l2', 'none'],
-     'pca__n_components': n_components,
-     'logistic_Reg__C': C},
-    {'logistic_Reg__solver': ['liblinear'],
-     'logistic_Reg__penalty': ['l1', 'l2'],
-     'pca__n_components': n_components,
-     'logistic_Reg__C': C},
-    {'logistic_Reg__solver': ['sag'],
-     'logistic_Reg__penalty': ['l2', 'none'],
-     'pca__n_components': n_components,
-     'logistic_Reg__C': C}
-]
+none_newton_params = [{'logistic_Reg__solver': ['newton-cg'],
+                       'logistic_Reg__penalty': ['none'],
+                       'pca__n_components': n_components,
+                       'logistic_Reg__C': C}]
 
-clf_GS = GridSearchCV(pipe, Grid_params, verbose=2)
+clf_GS = GridSearchCV(pipe, none_newton_params, verbose=2)
 clf_GS.fit(X, y)
 
 print('Best Penalty:', clf_GS.best_estimator_.get_params()['logistic_Reg__penalty'])
@@ -568,6 +547,7 @@ print('Best C:', clf_GS.best_estimator_.get_params()['logistic_Reg__C'])
 print('Best Number Of Components:', clf_GS.best_estimator_.get_params()['pca__n_components'])
 print(clf_GS.best_estimator_.get_params()['logistic_Reg'])
 print("Optimized logistic regression model accuracy:" + str(clf_GS.score(Xdev, ydev)))
+
 
 # Best Penalty: none
 # Best C: 0.1
@@ -605,7 +585,26 @@ print("Optimized logistic regression model accuracy:" + str(clf_GS.score(Xdev, y
 # Best SVC model accuracy: 0.6555023923444976
 # Linear SVC Accuracy: 0.6586921850079744
 
-#
-# linearSVC = make_pipeline(StandardScaler(), SVC(kernel="linear", C=1.5))
+
+# linearSVC = make_pipeline(StandardScaler(), SVC(kernel="linear"))
 # linearSVC.fit(X, y)
 # print("Linear SVC Accuracy: " + str(linearSVC.score(Xdev, ydev)))
+
+def test_preprocess(filename):
+    header = ["test_id", "Sentence_1", "Sentence_2"]
+    df = pd.read_csv(filename, quoting=3, encoding='utf8', error_bad_lines=False, names=header,
+                     sep='\t')
+    # Make all words lowercase
+    df['Sentence_1'] = df['Sentence_1'].str.lower()
+    df['Sentence_2'] = df['Sentence_2'].str.lower()
+    return df
+
+
+test_data = test_preprocess("test_without_label.txt")
+Xtest = all_features(test_data["Sentence_1"], test_data["Sentence_2"])
+Xoutput = pd.DataFrame()
+Xoutput['test_id'] = test_data["test_id"]
+Xoutput['prediction'] = clf_GS.predict(Xtest)
+
+# output_file = open("OwenFitzgeraldKing_test_result.txt", "w")
+Xoutput.to_csv("OwenFitzgeraldKing_test_result.txt", sep='\t', index=False, header=False)
